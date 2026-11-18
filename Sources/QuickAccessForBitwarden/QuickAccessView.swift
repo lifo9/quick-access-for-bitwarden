@@ -2,7 +2,9 @@ import QuickAccessCore
 import SwiftUI
 
 struct QuickAccessView: View {
-    static let panelSize = CGSize(width: 640, height: 420)
+    static let defaultPanelSize = CGSize(width: 640, height: 420)
+    /// Below this the search field and a few rows no longer fit.
+    static let minimumPanelSize = CGSize(width: 440, height: 260)
     /// The large, continuous corners of the system's own search panel.
     static let cornerRadius: CGFloat = 26
     /// Keeps the content clear of the rounded corners.
@@ -27,7 +29,13 @@ struct QuickAccessView: View {
                 .frame(height: 34)
                 .padding(.horizontal, Self.horizontalInset)
         }
-        .frame(width: Self.panelSize.width, height: Self.panelSize.height)
+        .frame(
+            minWidth: Self.minimumPanelSize.width,
+            maxWidth: .infinity,
+            minHeight: Self.minimumPanelSize.height,
+            maxHeight: .infinity
+        )
+        .background(WindowDragHandle())
         .overlay {
             // A hairline around the panel, which sets it apart from dark content behind it.
             RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
@@ -194,14 +202,26 @@ struct QuickAccessView: View {
                     .foregroundStyle(.orange)
                     .lineLimit(1)
             } else {
-                ForEach(footerHints, id: \.self) { hint in
-                    Text(hint)
-                        .foregroundStyle(.secondary)
+                // In a narrow panel the later, less needed hints are left out.
+                ViewThatFits(in: .horizontal) {
+                    hintRow(footerHints)
+                    hintRow(Array(footerHints.prefix(4)))
+                    hintRow(Array(footerHints.prefix(2)))
                 }
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
         .font(.system(size: 11))
+    }
+
+    private func hintRow(_ hints: [String]) -> some View {
+        HStack(spacing: 14) {
+            ForEach(hints, id: \.self) { hint in
+                Text(hint)
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+            }
+        }
     }
 
     private var footerHints: [String] {
@@ -215,6 +235,22 @@ struct QuickAccessView: View {
             return ["↩ Run", "← Back"]
         }
     }
+}
+
+/// Lets the panel be dragged by any part of it that is not a control. The window's own
+/// "movable by background" does not reach through the SwiftUI content.
+private struct WindowDragHandle: NSViewRepresentable {
+    final class HandleView: NSView {
+        override func mouseDown(with mouseDownEvent: NSEvent) {
+            window?.performDrag(with: mouseDownEvent)
+        }
+    }
+
+    func makeNSView(context: Context) -> HandleView {
+        HandleView()
+    }
+
+    func updateNSView(_ handleView: HandleView, context: Context) {}
 }
 
 /// A keyboard-driven list: the selection is drawn here and moved by the panel's key handling.

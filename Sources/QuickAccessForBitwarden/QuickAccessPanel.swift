@@ -3,12 +3,13 @@ import Carbon.HIToolbox
 import SwiftUI
 
 /// A borderless floating panel that takes keyboard input without activating this app, so the app
-/// the user was working in stays in front and gets the focus back when the panel closes.
+/// the user was working in stays in front and gets the focus back when the panel closes. It can
+/// be resized by its edges, down to a minimum size.
 private final class FloatingPanel: NSPanel {
-    init(contentSize: CGSize) {
+    init(contentSize: CGSize, minimumSize: CGSize) {
         super.init(
             contentRect: NSRect(origin: .zero, size: contentSize),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -21,6 +22,7 @@ private final class FloatingPanel: NSPanel {
         hasShadow = true
         isMovableByWindowBackground = true
         animationBehavior = .utilityWindow
+        minSize = minimumSize
     }
 
     // Borderless windows refuse the keyboard focus unless told otherwise.
@@ -37,7 +39,13 @@ private final class FloatingPanel: NSPanel {
 @MainActor
 final class QuickAccessPanelController: NSObject, NSWindowDelegate {
     private let model: QuickAccessModel
-    private let panel = FloatingPanel(contentSize: QuickAccessView.panelSize)
+    /// The name under which the system remembers where the panel was put and how large.
+    private static let frameAutosaveName = "QuickAccessPanel"
+
+    private let panel = FloatingPanel(
+        contentSize: QuickAccessView.defaultPanelSize,
+        minimumSize: QuickAccessView.minimumPanelSize
+    )
     private var keyDownMonitor: Any?
 
     init(model: QuickAccessModel) {
@@ -54,6 +62,8 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
         background.layer?.masksToBounds = true
 
         let hostingView = NSHostingView(rootView: QuickAccessView(model: model))
+        // The panel's size is the user's to choose; the content adapts to it, not the reverse.
+        hostingView.sizingOptions = []
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(hostingView)
         NSLayoutConstraint.activate([
@@ -65,6 +75,12 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
 
         panel.contentView = background
         panel.delegate = self
+        // A panel that was moved or resized comes back where and how it was left; until then it
+        // gets the default place.
+        if !panel.setFrameUsingName(Self.frameAutosaveName) {
+            placeAtDefaultPosition()
+        }
+        panel.setFrameAutosaveName(Self.frameAutosaveName)
         model.dismissPanel = { [weak self] in
             self?.hide()
         }
@@ -94,7 +110,6 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
     func show() {
         // Read before the panel opens: this is the app the user summoned the panel from.
         model.prepareForShowing(frontmostAppName: NSWorkspace.shared.frontmostApplication?.localizedName)
-        positionOnScreenWithMouse()
         panel.makeKeyAndOrderFront(nil)
 
         if !model.session.isUnlocked {
@@ -117,16 +132,14 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
         hide()
     }
 
-    private func positionOnScreenWithMouse() {
-        let mouseLocation = NSEvent.mouseLocation
-        let screenWithMouse = NSScreen.screens.first { $0.frame.contains(mouseLocation) } ?? NSScreen.main
-        guard let visibleFrame = screenWithMouse?.visibleFrame else {
+    private func placeAtDefaultPosition() {
+        guard let visibleFrame = NSScreen.main?.visibleFrame else {
             return
         }
         // Upper third of the screen, where Spotlight-style panels sit.
         let panelOrigin = NSPoint(
-            x: visibleFrame.midX - QuickAccessView.panelSize.width / 2,
-            y: visibleFrame.minY + visibleFrame.height * 0.72 - QuickAccessView.panelSize.height
+            x: visibleFrame.midX - panel.frame.width / 2,
+            y: visibleFrame.minY + visibleFrame.height * 0.72 - panel.frame.height
         )
         panel.setFrameOrigin(panelOrigin)
     }
