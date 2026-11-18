@@ -3,6 +3,8 @@ import Foundation
 
 public enum TotpError: Error, Equatable {
     case malformedSecret
+    /// The key asks for something this generator does not implement.
+    case unsupportedParameters
 }
 
 public enum TotpAlgorithm: Sendable, Equatable {
@@ -33,7 +35,12 @@ public struct TotpConfiguration: Sendable, Equatable {
             periodSeconds = 30
             usesSteamAlphabet = true
         } else if trimmedKey.lowercased().hasPrefix(Self.otpauthUriPrefix) {
-            let queryItems = URLComponents(string: trimmedKey)?.queryItems ?? []
+            let uriComponents = URLComponents(string: trimmedKey)
+            // Counter-based keys (`otpauth://hotp/`) need a counter this app does not keep.
+            guard uriComponents?.host?.lowercased() == "totp" else {
+                throw TotpError.unsupportedParameters
+            }
+            let queryItems = uriComponents?.queryItems ?? []
             let valuesByParameter = Dictionary(
                 queryItems.map { ($0.name.lowercased(), $0.value ?? "") },
                 uniquingKeysWith: { firstValue, _ in firstValue }
@@ -42,14 +49,16 @@ public struct TotpConfiguration: Sendable, Equatable {
                 throw TotpError.malformedSecret
             }
             secret = try Base32.decode(encodedSecret)
+            // A parameter that is present but not understood is refused: a code computed with
+            // a guessed algorithm, length or period would be wrong without anyone noticing.
             switch valuesByParameter["algorithm"]?.lowercased() {
+            case nil, "sha1": algorithm = .sha1
             case "sha256": algorithm = .sha256
             case "sha512": algorithm = .sha512
-            default: algorithm = .sha1
+            default: throw TotpError.unsupportedParameters
             }
-            // Out-of-range values fall back to the defaults, as authenticator apps do.
-            numDigits = valuesByParameter["digits"].flatMap(Int.init).flatMap { (1...10).contains($0) ? $0 : nil } ?? 6
-            periodSeconds = valuesByParameter["period"].flatMap(Int.init).flatMap { $0 > 0 ? $0 : nil } ?? 30
+            numDigits = try Self.parseParameter(valuesByParameter["digits"], default: 6, allowed: 1...10)
+            periodSeconds = try Self.parseParameter(valuesByParameter["period"], default: 30, allowed: 1...86_400)
             usesSteamAlphabet = false
         } else {
             secret = try Base32.decode(trimmedKey)
@@ -58,6 +67,20 @@ public struct TotpConfiguration: Sendable, Equatable {
             periodSeconds = 30
             usesSteamAlphabet = false
         }
+    }
+
+    private static func parseParameter(
+        _ text: String?,
+        default defaultNumber: Int,
+        allowed allowedNumbers: ClosedRange<Int>
+    ) throws -> Int {
+        guard let text else {
+            return defaultNumber
+        }
+        guard let number = Int(text), allowedNumbers.contains(number) else {
+            throw TotpError.unsupportedParameters
+        }
+        return number
     }
 }
 

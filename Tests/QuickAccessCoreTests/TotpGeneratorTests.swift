@@ -65,6 +65,25 @@ final class TotpGeneratorTests: XCTestCase {
         }
     }
 
+    func test_TotpConfiguration_init__rejectsParametersItCannotHonor() throws {
+        // A code computed with a guessed algorithm, length or period would be wrong without notice.
+        let unsupportedKeys = [
+            "otpauth://totp/Example?secret=\(sha1Secret)&algorithm=SHA384",
+            "otpauth://hotp/Example?secret=\(sha1Secret)&counter=1",
+            "otpauth://totp/Example?secret=\(sha1Secret)&digits=0",
+            "otpauth://totp/Example?secret=\(sha1Secret)&digits=11",
+            "otpauth://totp/Example?secret=\(sha1Secret)&digits=six",
+            "otpauth://totp/Example?secret=\(sha1Secret)&period=0",
+        ]
+        for unsupportedKey in unsupportedKeys {
+            XCTAssertThrowsError(try TotpConfiguration(authenticatorKey: unsupportedKey), "accepted \(unsupportedKey)")
+            {
+                error in
+                XCTAssertEqual(error as? TotpError, .unsupportedParameters)
+            }
+        }
+    }
+
     func test_secondsRemaining__countsDownToTheNextPeriod() throws {
         let configuration = try TotpConfiguration(authenticatorKey: sha1Secret)
 
