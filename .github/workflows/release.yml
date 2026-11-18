@@ -126,7 +126,8 @@ jobs:
           TEMP_KEYCHAIN_PASSWORD: ${{ secrets.TEMP_KEYCHAIN_PASSWORD }}
 
       # Lets anyone check with `gh attestation verify` that a downloaded image was built by this
-      # workflow from this repository.
+      # workflow from this repository. The Homebrew tap does, by this file's path and the branch,
+      # before it moves its cask to a release.
       - name: attest the disk image's provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

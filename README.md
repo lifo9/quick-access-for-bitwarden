@@ -45,9 +45,16 @@ The only network requests fetch website icons, as described under Security notes
 
 ## Install
 
-Releases are published on the repository's Releases page as a disk image, signed with a Developer
-ID certificate and notarized by Apple, for Apple silicon Macs: open it and drag the app to
-Applications.
+With [Homebrew](https://brew.sh):
+
+```sh
+brew install --cask lifo9/tap/quick-access-for-bitwarden
+```
+
+Or download the disk image from the
+[Releases page](https://github.com/lifo9/quick-access-for-bitwarden/releases), open it and drag
+the app to Applications. Both are the same build: signed with a Developer ID certificate and
+notarized by Apple, for Apple silicon Macs.
 
 To build from source instead:
 
