@@ -88,6 +88,11 @@ final class QuickAccessModel {
     // MARK: - Commands
 
     func updateQuery(_ newQuery: String) {
+        // The search field reports its text again whenever it takes the keyboard focus. That is
+        // not a new search and must not reset the selection or dismiss the notice.
+        guard newQuery != query else {
+            return
+        }
         query = newQuery
         notice = nil
         refreshMatchingItems()

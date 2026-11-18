@@ -257,6 +257,27 @@ final class QuickAccessModelTests: XCTestCase {
         XCTAssertEqual(harness.model.selectedItem?.name, "GitHub")
     }
 
+    func test_updateQuery__keepsTheSelectionWhenTheTextDidNotChange() async throws {
+        let harness = try await makeUnlockedHarness()
+        harness.model.moveSelection(by: 1)
+
+        // The search field reports its text again whenever it takes the keyboard focus.
+        harness.model.updateQuery("")
+
+        XCTAssertEqual(harness.model.selectedItem?.name, "GitHub")
+    }
+
+    func test_updateQuery__keepsTheNoticeWhenTheTextDidNotChange() async throws {
+        let harness = try await makeUnlockedHarness(ciphers: [
+            StateFileBuilder.makeLogin(name: "Protected", extra: ["reprompt": 1]),
+        ])
+        harness.model.activateSelection()
+
+        harness.model.updateQuery("")
+
+        XCTAssertNotNil(harness.model.notice)
+    }
+
     func test_prepareForShowing__suggestsItemNamedAfterTheAppInFront() async throws {
         let harness = try await makeUnlockedHarness()
 
