@@ -3,7 +3,7 @@ default:
 
 # The gate before a commit: format and lint check, build everything, run all tests.
 check:
-    for script in scripts/*.sh; do bash -n "$script" || exit 1; done
+    for script in scripts/*.sh; do bash -n "$script" && test -x "$script" || { echo "$script does not parse or is not executable"; exit 1; }; done
     swift format lint --strict --recursive Sources Tests Package.swift
     swift build --build-tests
     swift test

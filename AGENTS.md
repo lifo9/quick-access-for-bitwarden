@@ -7,7 +7,7 @@ the two desktop app internals it depends on.
 
 ## Checks
 
-`just check`: a syntax check of the shell scripts, `swift format lint --strict` over `Sources`,
+`just check`: a check that the shell scripts parse and are executable, `swift format lint --strict` over `Sources`,
 `Tests` and `Package.swift`, then
 `swift build --build-tests`, then `swift test`. Run it before every commit. `just format` applies
 the format, `just bundle` builds the `.app`.
