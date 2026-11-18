@@ -1,7 +1,13 @@
 version: 2
 updates:
-  # The package has no dependencies besides the actions used in the workflows.
+  # The app itself has no dependencies; these are the tools that build and release it.
   - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # fastlane, which signs and notarizes the release.
+  - package-ecosystem: "bundler"
     directory: "/"
     schedule:
       interval: "weekly"

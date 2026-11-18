@@ -1,0 +1,96 @@
+default_platform(:mac)
+opt_out_usage
+# The lanes are described in docs/releasing.md; no generated copy is wanted next to this file.
+skip_docs
+
+APP_IDENTIFIER = "dev.filo.quick-access-for-bitwarden"
+
+TEMP_KEYCHAIN_USER = ENV["TEMP_KEYCHAIN_USER"]
+TEMP_KEYCHAIN_PASSWORD = ENV["TEMP_KEYCHAIN_PASSWORD"]
+APPLE_ISSUER_ID = ENV["APPLE_ISSUER_ID"]
+APPLE_KEY_ID = ENV["APPLE_KEY_ID"]
+APPLE_KEY_CONTENT = ENV["APPLE_KEY_CONTENT"]
+GIT_AUTHORIZATION = ENV["GIT_AUTHORIZATION"]
+
+def temp_keychain_file(name)
+  File.expand_path("~/Library/Keychains/#{name}-db")
+end
+
+def delete_temp_keychain(name)
+  delete_keychain(
+    name: name
+  ) if File.exist? temp_keychain_file(name)
+end
+
+def create_temp_keychain(name, password)
+  # Unlike a keychain that only Xcode reads, this one is used by codesign directly, so it has to
+  # be unlocked and on the search list for the length of the lane.
+  create_keychain(
+    name: name,
+    password: password,
+    default_keychain: false,
+    unlock: true,
+    timeout: 3600,
+    add_to_search_list: true
+  )
+end
+
+def ensure_temp_keychain(name, password)
+  delete_temp_keychain(name)
+  create_temp_keychain(name, password)
+end
+
+platform :mac do
+  desc "Sign the app with Developer ID, notarize it and pack it into a notarized disk image"
+  lane :release do
+    keychain_name = TEMP_KEYCHAIN_USER
+    keychain_password = TEMP_KEYCHAIN_PASSWORD
+    ensure_temp_keychain(keychain_name, keychain_password)
+
+    api_key = app_store_connect_api_key(
+      key_id: APPLE_KEY_ID,
+      issuer_id: APPLE_ISSUER_ID,
+      key_content: APPLE_KEY_CONTENT,
+      duration: 1200,
+      in_house: false
+    )
+
+    # A Developer ID certificate can only be created by the account holder signed in with the
+    # Apple ID, not with an API key. It is created once with `fastlane match developer_id` and
+    # stored in the certificates repository; this lane only fetches it. The app uses no
+    # capability that needs a provisioning profile.
+    match(
+      type: "developer_id",
+      platform: "macos",
+      app_identifier: APP_IDENTIFIER,
+      git_basic_authorization: Base64.strict_encode64(GIT_AUTHORIZATION),
+      readonly: true,
+      skip_provisioning_profiles: true,
+      keychain_name: keychain_name,
+      keychain_password: keychain_password,
+      api_key: api_key
+    )
+
+    # Read by the two scripts below, which sign with whatever identity they are given.
+    ENV["CODE_SIGN_IDENTITY"] = "Developer ID Application"
+    ENV["CODE_SIGN_KEYCHAIN"] = temp_keychain_file(keychain_name)
+
+    # Plain Ruby in a lane runs inside the fastlane directory.
+    repository_root = File.expand_path("..")
+
+    # The app is notarized and stapled before it goes into the disk image, so that a copy
+    # dragged out of the image passes Gatekeeper without asking Apple.
+    sh("#{repository_root}/scripts/bundle-app.sh")
+    notarize(
+      package: "#{repository_root}/build/Quick Access for Bitwarden.app",
+      api_key: api_key,
+      print_log: true
+    )
+
+    # The script prints the path of the image as its last line.
+    disk_image = sh("#{repository_root}/scripts/make-disk-image.sh").lines.last.strip
+    notarize(package: disk_image, api_key: api_key, print_log: true)
+
+    delete_temp_keychain(keychain_name)
+  end
+end

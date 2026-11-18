@@ -4,3 +4,5 @@
 build/
 *.xcodeproj
 .DS_Store
+fastlane/report.xml
+vendor/bundle/

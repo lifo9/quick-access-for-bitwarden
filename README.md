@@ -42,17 +42,21 @@ The only network requests fetch website icons, as described under Security notes
   in its settings. Developed against version 2026.10.4.
 - An account with Bitwarden's classic encryption (see Limitations).
 
-## Build and install
+## Install
 
-There are no prebuilt downloads; the app is built from source on the Mac that runs it.
+Releases are published on the repository's Releases page as a disk image, signed with a Developer
+ID certificate and notarized by Apple, for Apple silicon Macs: open it and drag the app to
+Applications.
+
+To build from source instead:
 
 ```sh
 just install    # builds, copies the app to /Applications and starts it
 ```
 
 Without `just`: `scripts/bundle-app.sh` builds `build/Quick Access for Bitwarden.app`; copy it to
-`/Applications` and open it. The app is signed ad hoc, which runs on the Mac that built it. Set
-`CODE_SIGN_IDENTITY` to sign with a certificate instead.
+`/Applications` and open it. A build from source is signed ad hoc, which runs on the Mac that
+built it.
 
 "Launch at Login" is in the menu of the menu bar icon.
 
@@ -110,7 +114,8 @@ that shortcut off under System Settings → Keyboard → Keyboard Shortcuts.
 
 `just check` checks the format, builds everything and runs the tests; CI runs the same commands
 on every push and pull request. `just demo` runs the app against an invented vault, without the
-Bitwarden desktop app or Touch ID, and `just screencast` records the animation above from it. See [AGENTS.md](AGENTS.md) for the layout and the rules.
+Bitwarden desktop app or Touch ID, and `just screencast` records the animation above from it. See [AGENTS.md](AGENTS.md) for the layout and the rules, and
+[docs/releasing.md](docs/releasing.md) for how a release is cut.
 
 ## License
 

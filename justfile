@@ -38,3 +38,27 @@ screencast:
 # and decrypt the vault. Prints counts and settings, never secrets.
 diagnose *arguments:
     swift run QuickAccessForBitwarden --diagnose {{arguments}}
+
+# Tag a release; release.yml signs, notarizes and publishes the disk image.
+release version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! printf '%s' "{{version}}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        echo "error: expected semver MAJOR.MINOR.PATCH, got '{{version}}'" >&2
+        exit 1
+    fi
+    tag="v{{version}}"
+    if [ -n "$(git status --porcelain)" ]; then
+        echo "error: working tree is dirty; commit or stash before releasing" >&2
+        exit 1
+    fi
+    if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
+        echo "error: tag ${tag} already exists" >&2
+        exit 1
+    fi
+    # Edited in place rather than rewritten by a plist tool, which would drop the comments.
+    perl -0pi -e 's#(<key>CFBundle(?:ShortVersionString|Version)</key>\s*<string>)[^<]*#${1}{{version}}#g' Bundle/Info.plist
+    git add Bundle/Info.plist
+    git commit -m "chore(release): ${tag}"
+    git tag "${tag}"
+    git push origin HEAD "${tag}"

@@ -1,0 +1,59 @@
+name: release
+
+# `just release X.Y.Z` commits the version, tags it `vX.Y.Z` and pushes; the tag starts this.
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Creating the GitHub release needs write access to the repository's contents.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: sign + notarize + publish
+    # The same image and Xcode as `ci`, so the released binary is built like the tested one.
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode 27.2
+        run: sudo xcode-select --switch /Applications/Xcode_27.2.app
+
+      # The disk image is named after the version in the app; a tag that says something else
+      # would publish a release whose name and contents disagree.
+      - name: check that the tag is the app's version
+        run: |
+          app_version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Bundle/Info.plist)
+          if [ "v$app_version" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match the app's version $app_version"
+            exit 1
+          fi
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: sign, notarize and pack the disk image
+        run: bundle exec fastlane mac release
+        env:
+          TEMP_KEYCHAIN_USER: "${{ secrets.TEMP_KEYCHAIN_USER }}"
+          TEMP_KEYCHAIN_PASSWORD: "${{ secrets.TEMP_KEYCHAIN_PASSWORD }}"
+          APPLE_ISSUER_ID: "${{ secrets.APPLE_ISSUER_ID }}"
+          APPLE_KEY_ID: "${{ secrets.APPLE_KEY_ID }}"
+          APPLE_KEY_CONTENT: "${{ secrets.APPLE_KEY_CONTENT }}"
+          FASTLANE_CERTIFICATES_REPO_URL: "${{ secrets.FASTLANE_CERTIFICATES_REPO_URL }}"
+          GIT_AUTHORIZATION: "${{ secrets.GIT_AUTHORIZATION }}"
+          MATCH_PASSWORD: "${{ secrets.MATCH_PASSWORD }}"
+
+      - name: publish the GitHub release
+        run: gh release create "$GITHUB_REF_NAME" build/*.dmg --title "$GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

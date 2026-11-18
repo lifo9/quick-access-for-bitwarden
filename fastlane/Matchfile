@@ -1,0 +1,7 @@
+git_url(ENV["FASTLANE_CERTIFICATES_REPO_URL"])
+
+storage_mode("git")
+
+# The app is distributed outside the Mac App Store, signed with a Developer ID certificate.
+type("developer_id")
+platform("macos")

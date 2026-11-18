@@ -16,6 +16,11 @@ CI (`.github/workflows/ci.yml`) runs the same commands, one step each, and then
 development; when that changes, change it in the workflow too, since the format check follows the
 toolchain. A command added to `just check` has to be added to the workflow as well.
 
+`just release X.Y.Z` tags a release; `.github/workflows/release.yml` signs, notarizes and publishes
+it. [docs/releasing.md](docs/releasing.md) has the steps and the one-time setup. The release lane
+cannot be run without the signing secrets; `scripts/bundle-app.sh && scripts/make-disk-image.sh`
+exercises the packaging with an ad hoc signature.
+
 ## Layout
 
 - `Sources/QuickAccessCore`: everything without UI, with no AppKit: crypto, reading the desktop
@@ -24,6 +29,8 @@ toolchain. A command added to `just check` has to be added to the workflow as we
   `Demo/` holds an invented vault (`--demo`, `just demo`) and the recorder of the README's
   screencast (`just screencast`); rerun the recorder after a change to the panel's look.
 - `Tests/TestSupport`: test vectors and the state file builder, shared by both test targets.
+- `scripts/`, `fastlane/`, `Gemfile`: building the app bundle and the disk image, and the release
+  lane that signs and notarizes them.
 
 ## Rules
 
