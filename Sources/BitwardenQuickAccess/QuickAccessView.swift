@@ -29,40 +29,51 @@ struct QuickAccessView: View {
 
     // MARK: - Header
 
-    @ViewBuilder
     private var header: some View {
-        switch model.mode {
-        case .items:
-            HStack(spacing: 12) {
-                Image(systemName: model.session.isUnlocked ? "magnifyingglass" : "lock.fill")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 26)
-                TextField(
-                    "Search Bitwarden",
-                    text: Binding(get: { model.query }, set: { model.updateQuery($0) })
-                )
-                .textFieldStyle(.plain)
-                .font(.system(size: 22))
-                .focused($isSearchFieldFocused)
-                .disabled(!model.session.isUnlocked)
+        ZStack {
+            // The search field stays in place, hidden, while the actions of an item are shown.
+            // Removing it would drop the keyboard focus, and taking the focus again on the way
+            // back selects the whole query, so that the next key press would replace it.
+            searchField
+                .opacity(model.mode == .items ? 1 : 0)
+            if case let .actions(item) = model.mode {
+                itemHeader(item)
             }
-        case let .actions(item):
-            HStack(spacing: 12) {
-                ItemIcon(kind: item.kind)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(item.name)
-                        .font(.system(size: 17, weight: .semibold))
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 12) {
+            Image(systemName: model.session.isUnlocked ? "magnifyingglass" : "lock.fill")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 26)
+            TextField(
+                "Search Bitwarden",
+                text: Binding(get: { model.query }, set: { model.updateQuery($0) })
+            )
+            .textFieldStyle(.plain)
+            .font(.system(size: 22))
+            .focused($isSearchFieldFocused)
+            .disabled(!model.session.isUnlocked)
+        }
+    }
+
+    private func itemHeader(_ item: VaultItem) -> some View {
+        HStack(spacing: 12) {
+            ItemIcon(kind: item.kind)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.name)
+                    .font(.system(size: 17, weight: .semibold))
+                    .lineLimit(1)
+                if !item.subtitle.isEmpty {
+                    Text(item.subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
-                    if !item.subtitle.isEmpty {
-                        Text(item.subtitle)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
                 }
-                Spacer()
             }
+            Spacer()
         }
     }
 

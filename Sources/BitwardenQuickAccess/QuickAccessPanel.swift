@@ -157,7 +157,9 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
         case (_, [.command, .option]) where isLetterC:
             model.copyOneTimeCode()
         default:
-            return false
+            // Typing belongs to the search field, which is hidden but still focused while the
+            // actions of an item are shown; there, every other key press is swallowed.
+            return model.mode != .items
         }
         return true
     }
