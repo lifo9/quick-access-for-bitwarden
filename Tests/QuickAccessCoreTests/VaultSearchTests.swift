@@ -63,9 +63,9 @@ final class VaultSearchTests: XCTestCase {
     }
 
     func test_rank__ignoresCaseAndDiacritics() {
-        let items = [makeItem("Poštová banka")]
+        let items = [makeItem("Crème brûlée")]
 
-        XCTAssertEqual(rank(items, query: "POSTOVA"), ["Poštová banka"])
+        XCTAssertEqual(rank(items, query: "BRULEE"), ["Crème brûlée"])
     }
 
     func test_rank__breaksTiesByUsageThenFavoriteThenName() {
