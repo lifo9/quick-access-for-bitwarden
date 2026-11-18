@@ -52,9 +52,11 @@ public struct VaultItem: Identifiable, Sendable, Equatable {
     public let fields: [VaultField]
 
     public func revealValue(of field: VaultField) throws -> String {
-        // This app never sees the master password, so it cannot perform the re-prompt. It refuses
-        // instead of skipping a protection the user switched on for this item.
-        guard !(requiresMasterPasswordReprompt && field.isConcealed) else {
+        // This app never sees the master password, so it cannot perform the re-prompt. It
+        // releases only what the list shows anyway, who the login is for and where, and refuses
+        // everything else rather than deciding which other values are harmless.
+        let isShownInTheList = field.role == .username || field.role == .website
+        guard !requiresMasterPasswordReprompt || isShownInTheList else {
             throw VaultError.masterPasswordRepromptRequired
         }
         return try SymmetricCipher.decryptString(field.encryptedValue, with: field.itemKey)

@@ -97,7 +97,9 @@ public enum VaultDecryptor {
 
         let noteField = try builder.makeField(id: "notes", label: "Notes", role: .note, cipher.notes)
         let fields =
-            kindFields + [noteField].compactMap { $0 } + (try makeCustomFields(cipher.fields ?? [], builder: builder))
+            kindFields + [noteField].compactMap { $0 }
+            + (try makeCustomFields(
+                cipher.fields ?? [], canViewHiddenValues: cipher.viewPassword ?? true, builder: builder))
         let websites =
             try fields
             .filter { $0.role == .website }
@@ -222,17 +224,24 @@ public enum VaultDecryptor {
 
     private static let hiddenCustomFieldType = 1
 
+    /// - Parameter canViewHiddenValues: The "view password" permission, which the desktop app
+    ///   applies to hidden custom fields as well as to the password.
     private static func makeCustomFields(
         _ customFields: [EncryptedCustomField],
+        canViewHiddenValues: Bool,
         builder: FieldBuilder
     ) throws -> [VaultField] {
         try customFields.enumerated().compactMap { fieldIndex, customField in
+            let isHidden = customField.type == hiddenCustomFieldType
+            guard canViewHiddenValues || !isHidden else {
+                return nil
+            }
             let fieldName = try builder.decryptText(customField.name) ?? ""
             // Linked fields have no value of their own and are skipped by `makeField`.
             return try builder.makeField(
                 id: "field.\(fieldIndex)",
                 label: fieldName.isEmpty ? "Field \(fieldIndex + 1)" : fieldName,
-                isConcealed: customField.type == hiddenCustomFieldType,
+                isConcealed: isHidden,
                 customField.value
             )
         }

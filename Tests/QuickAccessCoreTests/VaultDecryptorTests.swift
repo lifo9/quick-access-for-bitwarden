@@ -191,6 +191,66 @@ final class VaultDecryptorTests: XCTestCase {
         XCTAssertEqual(try revealValue(ofFieldWithRole: .username, in: item), "alice@example.com")
     }
 
+    func test_revealValue__releasesOnlyUsernameAndWebsiteOfItemWithMasterPasswordReprompt() throws {
+        let protectedLogin = makeLogin(extra: [
+            "reprompt": 1,
+            "notes": Fixtures.encrypt("private note", with: Fixtures.userKey),
+            "fields": [
+                [
+                    "name": Fixtures.encrypt("Account number", with: Fixtures.userKey),
+                    "value": Fixtures.encrypt("12345", with: Fixtures.userKey),
+                    "type": 0,
+                ]
+            ],
+        ])
+        let item = try XCTUnwrap(unlock(ciphers: [protectedLogin]).items.first)
+
+        let releasedLabels = item.fields.filter { (try? item.revealValue(of: $0)) != nil }.map(\.label)
+
+        XCTAssertEqual(
+            item.fields.map(\.label),
+            ["Username", "Password", "One-time code", "Website", "Notes", "Account number"]
+        )
+        XCTAssertEqual(releasedLabels, ["Username", "Website"])
+    }
+
+    func test_revealValue__refusesTheNoteOfSecureNoteWithMasterPasswordReprompt() throws {
+        let protectedNote: [String: Any] = [
+            "id": "note-1",
+            "type": 2,
+            "name": Fixtures.encrypt("Recovery codes", with: Fixtures.userKey),
+            "notes": Fixtures.encrypt("1111 2222", with: Fixtures.userKey),
+            "reprompt": 1,
+        ]
+        let item = try XCTUnwrap(unlock(ciphers: [protectedNote]).items.first)
+
+        XCTAssertThrowsError(try item.revealValue(of: XCTUnwrap(item.defaultField))) { error in
+            XCTAssertEqual(error as? VaultError, .masterPasswordRepromptRequired)
+        }
+    }
+
+    func test_unlock__withholdsHiddenCustomFieldsWithoutViewPasswordPermission() throws {
+        let sharedLogin = makeLogin(extra: [
+            "viewPassword": false,
+            "fields": [
+                [
+                    "name": Fixtures.encrypt("Hint", with: Fixtures.userKey),
+                    "value": Fixtures.encrypt("the usual", with: Fixtures.userKey),
+                    "type": 0,
+                ],
+                [
+                    "name": Fixtures.encrypt("Recovery code", with: Fixtures.userKey),
+                    "value": Fixtures.encrypt("9999", with: Fixtures.userKey),
+                    "type": 1,
+                ],
+            ],
+        ])
+
+        let item = try XCTUnwrap(unlock(ciphers: [sharedLogin]).items.first)
+
+        XCTAssertEqual(item.fields.map(\.label), ["Username", "Website", "Hint"])
+    }
+
     // MARK: - Reading the state file
 
     func test_DesktopState_init__readsTheSettingsOfTheActiveAccount() throws {
