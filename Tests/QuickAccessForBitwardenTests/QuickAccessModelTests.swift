@@ -17,8 +17,12 @@ private final class FakeDesktop: DesktopAccess {
         self.stateFile = stateFile
     }
 
+    /// Runs right after the state file was read, to play a write by the desktop app.
+    var afterLoadState: () -> Void = {}
+
     func loadState() throws -> DesktopState {
-        try DesktopState(stateFileContents: stateFile)
+        defer { afterLoadState() }
+        return try DesktopState(stateFileContents: stateFile)
     }
 
     func readStateModificationDate() throws -> Date? {
@@ -36,6 +40,18 @@ private final class FakeDesktop: DesktopAccess {
 private final class EffectRecorder {
     var openedUrls = [URL]()
     var numDismissals = 0
+    var numKeyboardFocusRequests = 0
+}
+
+/// The time and the idle time the session sees.
+@MainActor
+private final class TestClock {
+    var now = Date(timeIntervalSince1970: 1_000_000)
+    var systemIdleSeconds: TimeInterval = 0
+
+    func advance(bySeconds seconds: TimeInterval) {
+        now += seconds
+    }
 }
 
 /// The model wired to a fake desktop app, a private pasteboard and private preferences.
@@ -45,12 +61,17 @@ private final class Harness {
     let pasteboard = NSPasteboard.withUniqueName()
     let session: VaultSession
     let model: QuickAccessModel
+    let clock = TestClock()
     private let effects = EffectRecorder()
     private let defaultsSuiteName = "QuickAccessModelTests-\(UUID().uuidString)"
 
     init(ciphers: [[String: Any]], settings: [String: Any] = [:]) throws {
         desktop = FakeDesktop(stateFile: try StateFileBuilder.makeStateFile(ciphers: ciphers, settings: settings))
-        session = VaultSession(desktop: desktop)
+        session = VaultSession(
+            desktop: desktop,
+            currentDate: { [clock] in clock.now },
+            readSystemIdleSeconds: { [clock] in clock.systemIdleSeconds }
+        )
         model = QuickAccessModel(
             session: session,
             clipboard: ClipboardWriter(pasteboard: pasteboard),
@@ -58,6 +79,11 @@ private final class Harness {
             openInBrowser: { [effects] in effects.openedUrls.append($0) }
         )
         model.dismissPanel = { [effects] in effects.numDismissals += 1 }
+        model.returnKeyboardFocusToPanel = { [effects] in effects.numKeyboardFocusRequests += 1 }
+    }
+
+    var numKeyboardFocusRequests: Int {
+        effects.numKeyboardFocusRequests
     }
 
     var openedUrls: [URL] {
@@ -360,6 +386,107 @@ final class QuickAccessModelTests: XCTestCase {
     }
 
     // MARK: - Locking and following the desktop app
+
+    func test_lock__makesTheOpenPanelForgetTheVault() async throws {
+        let harness = try await makeUnlockedHarness()
+        harness.model.showActionsOfSelectedItem()
+
+        harness.session.lock()
+        harness.model.copyPassword()
+        harness.model.copyPrimaryField()
+        harness.model.copyOneTimeCode()
+        harness.model.openWebsite()
+
+        XCTAssertNil(harness.copiedText)
+        XCTAssertEqual(harness.openedUrls, [])
+        XCTAssertEqual(harness.matchingItemNames, [])
+        XCTAssertEqual(harness.model.mode, .items)
+        XCTAssertEqual(harness.numDismissals, 0)
+    }
+
+    func test_prepareForShowing__locksWhenTheVaultTimeoutPassedSinceLastUse() async throws {
+        let harness = try await makeUnlockedHarness(settings: [
+            StateFileBuilder.settingKey("vaultTimeoutSettings_vaultTimeout"): 1
+        ])
+
+        harness.clock.advance(bySeconds: 61)
+        harness.model.prepareForShowing(frontmostAppName: nil)
+
+        XCTAssertFalse(harness.session.isUnlocked)
+        XCTAssertEqual(harness.matchingItemNames, [])
+    }
+
+    func test_copyPassword__locksInsteadOfCopyingWhenTheVaultTimeoutPassed() async throws {
+        let harness = try await makeUnlockedHarness(settings: [
+            StateFileBuilder.settingKey("vaultTimeoutSettings_vaultTimeout"): 1
+        ])
+
+        harness.clock.advance(bySeconds: 61)
+        harness.model.copyPassword()
+
+        XCTAssertNil(harness.copiedText)
+        XCTAssertFalse(harness.session.isUnlocked)
+    }
+
+    func test_copyPassword__locksWhenTheSystemWasIdleLongerThanTheDesktopAppAllows() async throws {
+        let harness = try await makeUnlockedHarness(settings: [
+            StateFileBuilder.settingKey("vaultTimeoutSettings_vaultTimeout"): "onIdle"
+        ])
+
+        // Waking the Mac after ten idle minutes: no periodic check has run yet.
+        harness.clock.systemIdleSeconds = 600
+        harness.model.copyPassword()
+
+        XCTAssertNil(harness.copiedText)
+        XCTAssertFalse(harness.session.isUnlocked)
+    }
+
+    func test_updateQuery__countsAsUseForTheVaultTimeout() async throws {
+        let harness = try await makeUnlockedHarness(settings: [
+            StateFileBuilder.settingKey("vaultTimeoutSettings_vaultTimeout"): 1
+        ])
+
+        harness.clock.advance(bySeconds: 40)
+        harness.model.updateQuery("git")
+        harness.clock.advance(bySeconds: 40)
+        harness.model.copyPassword()
+
+        XCTAssertEqual(harness.copiedText, "correct horse")
+    }
+
+    func test_unlock__returnsTheKeyboardFocusToThePanelAlsoWhenStartedWithReturn() async throws {
+        let harness = try makeHarness()
+        harness.model.prepareForShowing(frontmostAppName: nil)
+
+        harness.model.activateSelection()
+        for _ in 0..<200 where !harness.session.isUnlocked {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        // The Touch ID prompt takes the keyboard; without this the panel stays deaf.
+        for _ in 0..<200 where harness.numKeyboardFocusRequests == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(harness.numKeyboardFocusRequests, 1)
+    }
+
+    func test_prepareForShowing__picksUpAWriteThatHappenedWhileUnlocking() async throws {
+        let harness = try makeHarness()
+        let stateFileAfterSync = try StateFileBuilder.makeStateFile(ciphers: [
+            StateFileBuilder.makeLogin(id: "new", name: "Synced meanwhile")
+        ])
+        harness.desktop.afterLoadState = { [desktop = harness.desktop] in
+            desktop.afterLoadState = {}
+            desktop.stateFile = stateFileAfterSync
+            desktop.stateModificationDate = Date(timeIntervalSince1970: 2_000)
+        }
+
+        await harness.model.unlock()
+        XCTAssertEqual(harness.matchingItemNames, ["Bank", "GitHub"])
+
+        harness.model.prepareForShowing(frontmostAppName: nil)
+        XCTAssertEqual(harness.matchingItemNames, ["Synced meanwhile"])
+    }
 
     func test_handle__locksOnTheEventTheDesktopAppsVaultTimeoutNames() async throws {
         let harness = try await makeUnlockedHarness(settings: [

@@ -68,6 +68,12 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
         model.dismissPanel = { [weak self] in
             self?.hide()
         }
+        model.returnKeyboardFocusToPanel = { [weak self] in
+            guard let self, self.panel.isVisible else {
+                return
+            }
+            self.panel.makeKeyAndOrderFront(nil)
+        }
         keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] keyDownEvent in
             guard let self, keyDownEvent.window === self.panel else {
                 return keyDownEvent
@@ -94,10 +100,6 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
         if !model.session.isUnlocked {
             Task {
                 await model.unlock()
-                // The Touch ID prompt took the keyboard focus; take it back.
-                if panel.isVisible {
-                    panel.makeKeyAndOrderFront(nil)
-                }
             }
         }
     }
@@ -129,6 +131,16 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
         panel.setFrameOrigin(panelOrigin)
     }
 
+    /// Inside the query the right arrow moves the caret, as the left arrow does; only at its
+    /// end is it free to open the actions of the selected item.
+    private var isCaretAtEndOfQuery: Bool {
+        guard let queryEditor = panel.firstResponder as? NSTextView else {
+            return true
+        }
+        let selection = queryEditor.selectedRange()
+        return selection.length == 0 && selection.location == (queryEditor.string as NSString).length
+    }
+
     /// - Returns: Whether the key press was a command of the panel.
     private func handle(_ keyDownEvent: NSEvent) -> Bool {
         let modifiers = keyDownEvent.modifierFlags.intersection([.command, .option, .shift, .control])
@@ -143,7 +155,7 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
             model.activateSelection()
         case (kVK_Return, [.option]):
             model.openWebsite()
-        case (kVK_RightArrow, []):
+        case (kVK_RightArrow, []) where isCaretAtEndOfQuery:
             model.showActionsOfSelectedItem()
         case (kVK_LeftArrow, []) where model.mode != .items:
             model.showItems()

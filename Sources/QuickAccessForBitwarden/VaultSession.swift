@@ -24,15 +24,30 @@ final class VaultSession {
         isBiometricUnlockEnabled: false
     )
 
+    /// Called after the vault was locked, whatever locked it.
+    var didLock: () -> Void = {}
+
     private let desktop: any DesktopAccess
+    private let currentDate: () -> Date
+    private let readSystemIdleSeconds: () -> TimeInterval
     private var userKey: SymmetricCryptoKey?
     private var unlockedUserId: String?
     private var stateFileModificationDate: Date?
-    private var lastUseDate = Date()
+    private var lastUseDate: Date
     private var periodicCheck: Timer?
 
-    init(desktop: any DesktopAccess) {
+    /// - Parameters:
+    ///   - currentDate: The clock, replaced in tests.
+    ///   - readSystemIdleSeconds: How long the Mac has had no input, replaced in tests.
+    init(
+        desktop: any DesktopAccess,
+        currentDate: @escaping () -> Date = { Date() },
+        readSystemIdleSeconds: @escaping () -> TimeInterval = VaultSession.readSystemIdleSeconds
+    ) {
         self.desktop = desktop
+        self.currentDate = currentDate
+        self.readSystemIdleSeconds = readSystemIdleSeconds
+        lastUseDate = currentDate()
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification,
             object: nil,
@@ -54,7 +69,7 @@ final class VaultSession {
         periodicCheck = Timer.scheduledTimer(withTimeInterval: Self.periodicCheckInterval, repeats: true) {
             [weak self] _ in
             MainActor.assumeIsolated {
-                self?.runPeriodicCheck()
+                self?.enforceVaultTimeout()
             }
         }
     }
@@ -64,7 +79,7 @@ final class VaultSession {
     }
 
     func noteUse() {
-        lastUseDate = Date()
+        lastUseDate = currentDate()
     }
 
     func unlock() async {
@@ -73,8 +88,10 @@ final class VaultSession {
         }
         state = .unlocking
         do {
-            let desktopState = try desktop.loadState()
+            // Noted before the contents are read: a write by the desktop app in between then
+            // shows up as a change at the next reload instead of counting as already seen.
             let stateFileModificationDate = try desktop.readStateModificationDate()
+            let desktopState = try desktop.loadState()
             let outcome = try await desktop.requestUnlock(userId: desktopState.userId)
             switch outcome {
             case .unlocked(let userKey):
@@ -83,7 +100,7 @@ final class VaultSession {
                 self.unlockedUserId = desktopState.userId
                 self.stateFileModificationDate = stateFileModificationDate
                 settings = desktopState.settings
-                lastUseDate = Date()
+                lastUseDate = currentDate()
                 state = .unlocked(vault)
             case .denied:
                 state = .locked(explanation: "Touch ID was cancelled.")
@@ -99,6 +116,7 @@ final class VaultSession {
         userKey = nil
         unlockedUserId = nil
         state = .locked(explanation: nil)
+        didLock()
     }
 
     /// Picks up what the desktop app has synced or changed since the vault was decrypted.
@@ -126,16 +144,20 @@ final class VaultSession {
         }
     }
 
-    private func runPeriodicCheck() {
-        // Any kind of input counts as activity, as it does for the desktop app's idle check.
-        let anyInputEventType = CGEventType(rawValue: UInt32.max)!
-        let systemIdleSeconds = CGEventSource.secondsSinceLastEventType(
-            .combinedSessionState, eventType: anyInputEventType)
+    /// Locks the vault if the vault timeout has passed. Runs periodically, and whenever the
+    /// panel is about to use the vault.
+    func enforceVaultTimeout() {
         handle(
             .periodicCheck(
-                systemIdleSeconds: systemIdleSeconds,
-                secondsSinceLastUse: Date().timeIntervalSince(lastUseDate)
+                systemIdleSeconds: readSystemIdleSeconds(),
+                secondsSinceLastUse: currentDate().timeIntervalSince(lastUseDate)
             ))
+    }
+
+    nonisolated static func readSystemIdleSeconds() -> TimeInterval {
+        // Any kind of input counts as activity, as it does for the desktop app's idle check.
+        let anyInputEventType = CGEventType(rawValue: UInt32.max)!
+        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInputEventType)
     }
 
     /// Locks the vault if the desktop app's vault timeout setting asks for it on this event.

@@ -43,6 +43,8 @@ final class QuickAccessModel {
     private var frontmostAppName: String?
     /// Closes the panel; set by the panel controller.
     var dismissPanel: () -> Void = {}
+    /// Makes the panel take the keyboard again; set by the panel controller.
+    var returnKeyboardFocusToPanel: () -> Void = {}
 
     init(
         session: VaultSession,
@@ -54,6 +56,10 @@ final class QuickAccessModel {
         self.clipboard = clipboard
         self.usageStore = usageStore
         self.openInBrowser = openInBrowser
+        // The items carry their keys, so a locked session must not leave them in the panel.
+        session.didLock = { [weak self] in
+            self?.refreshMatchingItems()
+        }
     }
 
     var selectedItem: VaultItem? {
@@ -74,6 +80,10 @@ final class QuickAccessModel {
         query = ""
         mode = .items
         notice = nil
+        // The periodic check may not have run since the timeout passed, for example right after
+        // the Mac woke up.
+        session.enforceVaultTimeout()
+        session.noteUse()
         session.reloadIfDesktopStateChanged()
         refreshMatchingItems()
         focusRequestCount += 1
@@ -83,6 +93,8 @@ final class QuickAccessModel {
         await session.unlock()
         refreshMatchingItems()
         focusRequestCount += 1
+        // The Touch ID prompt took the keyboard from the panel.
+        returnKeyboardFocusToPanel()
     }
 
     // MARK: - Commands
@@ -95,10 +107,14 @@ final class QuickAccessModel {
         }
         query = newQuery
         notice = nil
+        _ = useVault()
         refreshMatchingItems()
     }
 
     func moveSelection(by offset: Int) {
+        guard useVault() else {
+            return
+        }
         switch mode {
         case .items:
             selectedItemIndex = Self.clamp(selectedItemIndex + offset, toCount: matchingItems.count)
@@ -109,7 +125,7 @@ final class QuickAccessModel {
 
     /// Return: unlocks when locked, otherwise copies the item's main secret or runs the action.
     func activateSelection() {
-        guard session.isUnlocked else {
+        guard useVault() else {
             Task { await unlock() }
             return
         }
@@ -142,7 +158,7 @@ final class QuickAccessModel {
     }
 
     func showActionsOfSelectedItem() {
-        guard mode == .items, let item = selectedItem else {
+        guard useVault(), mode == .items, let item = selectedItem else {
             return
         }
         notice = nil
@@ -180,7 +196,7 @@ final class QuickAccessModel {
     }
 
     func openWebsite() {
-        guard let item = currentItem else {
+        guard useVault(), let item = currentItem else {
             return
         }
         guard let websiteField = item.firstField(withRole: .website) else {
@@ -200,8 +216,20 @@ final class QuickAccessModel {
         return selectedItem
     }
 
+    /// Every command that touches the vault starts here: it applies the vault timeout, which
+    /// the periodic check may not have done yet, and counts the command as use of the app.
+    /// - Returns: Whether the vault is unlocked.
+    private func useVault() -> Bool {
+        session.enforceVaultTimeout()
+        guard session.isUnlocked else {
+            return false
+        }
+        session.noteUse()
+        return true
+    }
+
     private func copyField(of item: VaultItem?, select: (VaultItem) -> VaultField?) {
-        guard let item else {
+        guard useVault(), let item else {
             return
         }
         guard let field = select(item) else {
@@ -252,6 +280,7 @@ final class QuickAccessModel {
             matchingItems = []
             selectedItemIndex = 0
             mode = .items
+            notice = nil
             return
         }
         matchingItems = VaultSearch.rank(
