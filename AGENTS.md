@@ -8,8 +8,13 @@ the two desktop app internals it depends on.
 ## Checks
 
 `just check`: `swift format lint --strict` over `Sources`, `Tests` and `Package.swift`, then
-`swift build --build-tests`, then `swift test`. There is no CI yet; run it before every commit.
-`just format` applies the format, `just bundle` builds the `.app`.
+`swift build --build-tests`, then `swift test`. Run it before every commit. `just format` applies
+the format, `just bundle` builds the `.app`.
+
+CI (`.github/workflows/ci.yml`) runs the same commands, one step each, and then
+`scripts/bundle-app.sh`, on GitHub's `xcode-27` runner. It selects the Xcode version used for
+development; when that changes, change it in the workflow too, since the format check follows the
+toolchain. A command added to `just check` has to be added to the workflow as well.
 
 ## Layout
 

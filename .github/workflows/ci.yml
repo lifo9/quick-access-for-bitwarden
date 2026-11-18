@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Every job only reads the repository.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: lint + build + test
+    # The app needs the macOS SDK even to compile, so nothing here can run on a Linux runner.
+    # This image carries the Xcode the app is developed with.
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+
+      # The image defaults to an older Xcode 27. The format check and the compiler's diagnostics
+      # follow the toolchain, so CI uses the version used for development.
+      - name: Select Xcode 27.2
+        run: sudo xcode-select --switch /Applications/Xcode_27.2.app
+
+      # The steps below are the commands of `just check`, one step each.
+      - name: swift format lint
+        run: swift format lint --strict --recursive Sources Tests Package.swift
+
+      - name: swift build
+        run: swift build --build-tests
+
+      - name: swift test
+        run: swift test
+
+      # Not part of `just check`: proves that the release build and the app bundle still assemble.
+      - name: bundle the app
+        run: scripts/bundle-app.sh
