@@ -166,7 +166,7 @@ final class VaultSession {
         case DesktopStateError.unsupportedAccountEncryption:
             "This account uses a newer encryption format that is not supported yet."
         case DesktopIpcError.noReply:
-            "Bitwarden did not answer. Check that the desktop app is running and that \"Allow browser integration\" is on in its settings."
+            "Bitwarden did not answer. Check that the desktop app is running."
         case DesktopIpcError.accountNotLoggedIntoDesktopApp:
             "The Bitwarden desktop app is logged in to a different account."
         case VaultError.userKeyDoesNotMatchAccount:
