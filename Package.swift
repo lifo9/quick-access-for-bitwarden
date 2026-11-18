@@ -3,14 +3,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "BitwardenQuickAccess",
+    name: "QuickAccessForBitwarden",
     platforms: [
         .macOS(.v15)
     ],
     targets: [
         .target(name: "QuickAccessCore"),
         .executableTarget(
-            name: "BitwardenQuickAccess",
+            name: "QuickAccessForBitwarden",
             dependencies: ["QuickAccessCore"]
         ),
         // Test vectors and builders shared by both test targets.
@@ -24,8 +24,8 @@ let package = Package(
             dependencies: ["QuickAccessCore", "QuickAccessTestSupport"]
         ),
         .testTarget(
-            name: "BitwardenQuickAccessTests",
-            dependencies: ["BitwardenQuickAccess", "QuickAccessCore", "QuickAccessTestSupport"]
+            name: "QuickAccessForBitwardenTests",
+            dependencies: ["QuickAccessForBitwarden", "QuickAccessCore", "QuickAccessTestSupport"]
         ),
     ]
 )

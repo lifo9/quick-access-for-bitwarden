@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Bitwarden Quick Access</string>
+	<string>Quick Access for Bitwarden</string>
 	<key>CFBundleDisplayName</key>
-	<string>Bitwarden Quick Access</string>
+	<string>Quick Access for Bitwarden</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.filo.bitwarden-quick-access</string>
+	<string>dev.filo.quick-access-for-bitwarden</string>
 	<key>CFBundleExecutable</key>
-	<string>BitwardenQuickAccess</string>
+	<string>QuickAccessForBitwarden</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

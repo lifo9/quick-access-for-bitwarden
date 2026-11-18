@@ -3,7 +3,7 @@ import QuickAccessCore
 import QuickAccessTestSupport
 import XCTest
 
-@testable import BitwardenQuickAccess
+@testable import QuickAccessForBitwarden
 
 /// Stands in for the Bitwarden desktop app: serves a state file and answers unlock requests.
 @MainActor

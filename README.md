@@ -1,4 +1,4 @@
-# Bitwarden Quick Access
+# Quick Access for Bitwarden
 
 A macOS menu bar app that opens a Spotlight-style panel on a global shortcut to search a Bitwarden
 vault and copy usernames, passwords, one-time codes and other fields, without switching to the
@@ -42,7 +42,7 @@ what the panel shows.
 just install    # builds, copies the app to /Applications and starts it
 ```
 
-Without `just`: `scripts/bundle-app.sh` builds `build/Bitwarden Quick Access.app`; copy it to
+Without `just`: `scripts/bundle-app.sh` builds `build/Quick Access for Bitwarden.app`; copy it to
 `/Applications` and open it. The app is signed ad hoc, which runs on the Mac that built it. Set
 `CODE_SIGN_IDENTITY` to sign with a certificate instead.
 

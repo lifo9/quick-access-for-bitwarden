@@ -1,4 +1,4 @@
-# Bitwarden Quick Access
+# Quick Access for Bitwarden
 
 A macOS menu bar app: a Spotlight-style panel to search the Bitwarden vault and copy values. It is
 a companion to the Bitwarden desktop app, which unlocks (Touch ID) and holds the synced vault.
@@ -15,7 +15,7 @@ the two desktop app internals it depends on.
 
 - `Sources/QuickAccessCore`: everything without UI, with no AppKit: crypto, reading the desktop
   state file, vault decryption, one-time codes, search ranking, lock policy, the IPC client.
-- `Sources/BitwardenQuickAccess`: the app: hot key, panel, model, session, clipboard.
+- `Sources/QuickAccessForBitwarden`: the app: hot key, panel, model, session, clipboard.
 - `Tests/TestSupport`: test vectors and the state file builder, shared by both test targets.
 
 ## Rules

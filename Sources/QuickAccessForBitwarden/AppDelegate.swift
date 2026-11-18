@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(
             systemSymbolName: "key.horizontal.fill",
-            accessibilityDescription: "Bitwarden Quick Access"
+            accessibilityDescription: "Quick Access for Bitwarden"
         )
 
         let menu = NSMenu()
