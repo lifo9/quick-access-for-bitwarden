@@ -12,7 +12,7 @@ final class WebsiteIconTests: XCTestCase {
     }
 
     /// The icon service a state file with this environment and setting leads to.
-    private func readIconServer(environment: [String: Any]?, showsIcons: Bool? = nil) throws -> String? {
+    private func readIconServer(environment: [String: Any]?, showsIcons: Any? = nil) throws -> String? {
         let environmentSetting: [String: Any] =
             environment.map { [StateFileBuilder.settingKey("environment_environment"): $0] } ?? [:]
         let iconSetting: [String: Any] = showsIcons.map { ["global_domainSettings_showFavicons": $0] } ?? [:]
@@ -77,6 +77,15 @@ final class WebsiteIconTests: XCTestCase {
 
     func test_DesktopState_init__givesNoIconServiceWhenIconsAreSwitchedOffInTheDesktopApp() throws {
         XCTAssertNil(try readIconServer(environment: ["region": "EU"], showsIcons: false))
+    }
+
+    func test_DesktopState_init__readsAnIconSettingItDoesNotUnderstandAsOff() throws {
+        // Only a setting that was never changed means "on"; guessing would name websites to
+        // the icon service against a choice this app failed to read.
+        XCTAssertNil(try readIconServer(environment: ["region": "EU"], showsIcons: "disabled"))
+        XCTAssertNil(try readIconServer(environment: ["region": "EU"], showsIcons: ["value": false]))
+        XCTAssertEqual(
+            try readIconServer(environment: ["region": "EU"], showsIcons: NSNull()), "https://icons.bitwarden.eu")
     }
 
     func test_DesktopState_init__givesNoIconServiceWhenTheServerIsNotKnown() throws {

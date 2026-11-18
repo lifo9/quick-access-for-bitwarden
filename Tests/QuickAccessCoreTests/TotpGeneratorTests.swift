@@ -65,6 +65,12 @@ final class TotpGeneratorTests: XCTestCase {
         }
     }
 
+    func test_generateCode__treatsEmptyParametersAsNotGiven() throws {
+        let uriWithEmptyParameters = "otpauth://totp/Example?secret=\(sha1Secret)&algorithm=&digits=&period="
+
+        XCTAssertEqual(try generateCode(authenticatorKey: uriWithEmptyParameters, secondsSince1970: 59), "287082")
+    }
+
     func test_TotpConfiguration_init__rejectsParametersItCannotHonor() throws {
         // A code computed with a guessed algorithm, length or period would be wrong without notice.
         let unsupportedKeys = [

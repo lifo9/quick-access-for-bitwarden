@@ -34,7 +34,12 @@ final class WebsiteIconStore {
             return
         }
         let numTimesForgottenAtStart = numTimesForgotten
-        guard let iconData = try? await fetchIconData(iconUrl),
+        // Not a child of the caller's task: a row that scrolls away or is filtered out cancels
+        // its task, and that must not be recorded as "this icon could not be fetched".
+        let fetch = Task { [fetchIconData] in
+            try? await fetchIconData(iconUrl)
+        }
+        guard let iconData = await fetch.value,
             iconData.count <= Self.maxIconByteCount,
             let icon = NSImage(data: iconData), icon.isValid,
             numTimesForgotten == numTimesForgottenAtStart

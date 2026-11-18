@@ -34,6 +34,8 @@ final class VaultSession {
     private var unlockedUserId: String?
     private var stateFileModificationDate: Date?
     private var lastUseDate: Date
+    /// When the Mac went to sleep, and how long it had been without input by then.
+    private var sleepStart: (date: Date, systemIdleSeconds: TimeInterval)?
     private var periodicCheck: Timer?
 
     /// - Parameters:
@@ -54,7 +56,16 @@ final class VaultSession {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.handle(.systemWillSleep)
+                self?.systemWillSleep()
+            }
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.systemDidWake()
             }
         }
         DistributedNotificationCenter.default().addObserver(
@@ -142,6 +153,27 @@ final class VaultSession {
             lock()
             state = .locked(explanation: Self.explain(error))
         }
+    }
+
+    func systemWillSleep() {
+        sleepStart = (currentDate(), readSystemIdleSeconds())
+        handle(.systemWillSleep)
+    }
+
+    /// No periodic check runs while the Mac sleeps, and the key press that wakes it resets the
+    /// system's idle time. The time before the sleep and the sleep itself are therefore counted
+    /// here as the one idle period they are.
+    func systemDidWake() {
+        guard let sleepStart else {
+            return
+        }
+        self.sleepStart = nil
+        let now = currentDate()
+        handle(
+            .periodicCheck(
+                systemIdleSeconds: sleepStart.systemIdleSeconds + now.timeIntervalSince(sleepStart.date),
+                secondsSinceLastUse: now.timeIntervalSince(lastUseDate)
+            ))
     }
 
     /// Locks the vault if the vault timeout has passed. Runs periodically, and whenever the

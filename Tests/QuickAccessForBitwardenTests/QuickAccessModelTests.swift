@@ -51,6 +51,8 @@ private final class FakeIconService: @unchecked Sendable {
     }
 
     func fetch(_ iconUrl: URL) async throws -> Data {
+        // Like a network request, this fails when the task it runs in was cancelled.
+        try Task.checkCancellation()
         let responseData = lock.withLock {
             urls.append(iconUrl)
             return data
@@ -461,6 +463,21 @@ final class QuickAccessModelTests: XCTestCase {
         XCTAssertEqual(harness.iconService.requestedUrls, [iconUrl])
     }
 
+    func test_loadIcon__stillLoadsWhenTheRowThatAskedForItGoesAway() async throws {
+        let harness = try await makeUnlockedHarness(settings: makeIconSettings())
+        let iconUrl = try XCTUnwrap(harness.model.websiteIconUrl(of: XCTUnwrap(harness.model.selectedItem)))
+
+        // A row that scrolls away or is filtered out cancels the task it asked for its icon in.
+        let rowTask = Task { await harness.model.iconStore.loadIcon(at: iconUrl) }
+        rowTask.cancel()
+        await rowTask.value
+        for _ in 0..<200 where harness.model.iconStore.icon(at: iconUrl) == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertNotNil(harness.model.iconStore.icon(at: iconUrl))
+    }
+
     func test_loadIcon__doesNotRepeatARequestThatFailed() async throws {
         let harness = try await makeUnlockedHarness(settings: makeIconSettings())
         let iconUrl = try XCTUnwrap(harness.model.websiteIconUrl(of: XCTUnwrap(harness.model.selectedItem)))
@@ -536,17 +553,36 @@ final class QuickAccessModelTests: XCTestCase {
         XCTAssertFalse(harness.session.isUnlocked)
     }
 
-    func test_copyPassword__locksWhenTheSystemWasIdleLongerThanTheDesktopAppAllows() async throws {
+    func test_systemDidWake__locksWhenIdleTimeAndSleepTogetherExceedWhatTheDesktopAppAllows() async throws {
         let harness = try await makeUnlockedHarness(settings: [
             StateFileBuilder.settingKey("vaultTimeoutSettings_vaultTimeout"): "onIdle"
         ])
 
-        // Waking the Mac after ten idle minutes: no periodic check has run yet.
-        harness.clock.systemIdleSeconds = 600
+        // The lid closes after a minute without input and opens an hour later. No periodic check
+        // ran in between, and the key press that wakes the Mac resets the system's idle time.
+        harness.clock.systemIdleSeconds = 60
+        harness.session.systemWillSleep()
+        harness.clock.advance(bySeconds: 3600)
+        harness.clock.systemIdleSeconds = 0
+        harness.session.systemDidWake()
         harness.model.copyPassword()
 
         XCTAssertNil(harness.copiedText)
         XCTAssertFalse(harness.session.isUnlocked)
+    }
+
+    func test_systemDidWake__keepsTheVaultUnlockedAfterAShortSleep() async throws {
+        let harness = try await makeUnlockedHarness(settings: [
+            StateFileBuilder.settingKey("vaultTimeoutSettings_vaultTimeout"): "onIdle"
+        ])
+
+        harness.clock.systemIdleSeconds = 60
+        harness.session.systemWillSleep()
+        harness.clock.advance(bySeconds: 120)
+        harness.clock.systemIdleSeconds = 0
+        harness.session.systemDidWake()
+
+        XCTAssertTrue(harness.session.isUnlocked)
     }
 
     func test_updateQuery__countsAsUseForTheVaultTimeout() async throws {

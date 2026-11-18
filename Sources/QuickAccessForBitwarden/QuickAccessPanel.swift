@@ -115,6 +115,11 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
     func show() {
         // Read before the panel opens: this is the app the user summoned the panel from.
         model.prepareForShowing(frontmostAppName: NSWorkspace.shared.frontmostApplication?.localizedName)
+        // The remembered frame may be on a display that is no longer connected; a borderless
+        // window is not moved back into view by the system.
+        if !isPanelOnAConnectedScreen {
+            placeAtDefaultPosition()
+        }
         NSApp.activate()
         panel.makeKeyAndOrderFront(nil)
 
@@ -138,6 +143,11 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
             return
         }
         hide()
+    }
+
+    private var isPanelOnAConnectedScreen: Bool {
+        let panelCenter = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
+        return NSScreen.screens.contains { $0.frame.contains(panelCenter) }
     }
 
     private func placeAtDefaultPosition() {

@@ -41,8 +41,11 @@ public struct TotpConfiguration: Sendable, Equatable {
                 throw TotpError.unsupportedParameters
             }
             let queryItems = uriComponents?.queryItems ?? []
+            // A parameter without a value (`digits=`) counts as not given.
             let valuesByParameter = Dictionary(
-                queryItems.map { ($0.name.lowercased(), $0.value ?? "") },
+                queryItems.compactMap { queryItem in
+                    queryItem.value.flatMap { $0.isEmpty ? nil : (queryItem.name.lowercased(), $0) }
+                },
                 uniquingKeysWith: { firstValue, _ in firstValue }
             )
             guard let encodedSecret = valuesByParameter["secret"] else {

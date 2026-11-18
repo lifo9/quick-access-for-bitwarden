@@ -134,11 +134,18 @@ private struct StateFile: Decodable {
                 forKey: userStateKey("biometricSettings_biometricUnlockEnabled")
             ) ?? false
 
-        // Icons are an extra: an environment in a shape this app does not know means no icons,
-        // not a vault that cannot be read.
-        let showsWebsiteIcons =
-            (try? container.decodeIfPresent(Bool.self, forKey: StateKey("global_domainSettings_showFavicons")))
-            ?? true
+        // Icons are an extra: a setting or an environment in a shape this app does not know means
+        // no icons, not a vault that cannot be read.
+        let iconSettingKey = StateKey("global_domainSettings_showFavicons")
+        let showsWebsiteIcons: Bool
+        if !container.contains(iconSettingKey) || (try? container.decodeNil(forKey: iconSettingKey)) == true {
+            // Never changed in the desktop app, where icons are on by default.
+            showsWebsiteIcons = true
+        } else {
+            // A value this app cannot read is taken as "off": guessing "on" would name websites
+            // to the icon service against a choice that was made but not understood.
+            showsWebsiteIcons = (try? container.decode(Bool.self, forKey: iconSettingKey)) ?? false
+        }
         let accountEnvironment = try? container.decodeIfPresent(
             StoredEnvironment.self,
             forKey: userStateKey("environment_environment")
