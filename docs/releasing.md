@@ -11,17 +11,23 @@ Sandbox, in which the app can reach neither the desktop app's helper nor its soc
 just release X.Y.Z
 ```
 
-writes the version into `Bundle/Info.plist`, commits it as `chore(release): vX.Y.Z`, tags the
-commit `vX.Y.Z` and pushes both. The tag starts `.github/workflows/release.yml`, which on GitHub's
-macOS runner:
+opens a pull request that sets the version in `Bundle/Info.plist`. Merging it starts
+`.github/workflows/release.yml`. The workflow can also be started by hand (Actions → release → Run
+workflow), which releases the version currently on `main`: that is how the first release is cut and
+how a failed one is tried again. A version that already has a release is never released twice.
 
-1. checks that the tag is the version in `Bundle/Info.plist`;
-2. runs the `mac release` lane of `fastlane/Fastfile`, which
-   - fetches the Developer ID certificate with `match` into a keychain made for the run,
-   - builds and signs the app (`scripts/bundle-app.sh`), has it notarized and staples the ticket,
-   - packs it into a disk image (`scripts/make-disk-image.sh`), signs the image and has it
+The workflow does:
+
+1. `scripts/release.sh`, on GitHub's macOS runner:
+   - creates a keychain for the run and fetches the Developer ID certificate into it with
+     `fastlane match`, read-only;
+   - builds and signs the app (`scripts/bundle-app.sh`), has Apple notarize it with `notarytool`
+     and staples the ticket;
+   - packs the app into a disk image (`scripts/make-disk-image.sh`), signs the image and has it
      notarized and stapled as well;
-3. creates the GitHub release for the tag with the disk image and generated notes.
+   - deletes the keychain and the notarization key again.
+2. A build provenance attestation for the disk image.
+3. The GitHub release `vX.Y.Z` on the merged commit, with the disk image and generated notes.
 
 The build is for Apple silicon only.
 
@@ -29,33 +35,33 @@ The build is for Apple silicon only.
 
 **The certificate.** A "Developer ID Application" certificate can only be created by the account
 holder of the Apple Developer team, signed in with the Apple ID; an App Store Connect API key
-cannot create it. Create it once, into the `match` certificates repository, from a Mac:
+cannot create it. Create it once, into the `match` repository, from a Mac:
 
 ```sh
-FASTLANE_CERTIFICATES_REPO_URL=<the certificates repository> \
-    bundle exec fastlane match developer_id --platform macos --skip_provisioning_profiles \
-    --app_identifier dev.filo.quick-access-for-bitwarden
+MATCH_GIT_URL=<the match repository> \
+MATCH_TYPE=developer_id MATCH_PLATFORM=macos MATCH_SKIP_PROVISIONING_PROFILES=true \
+MATCH_APP_IDENTIFIER=dev.filo.quick-access-for-bitwarden \
+    bundle exec fastlane match
 ```
 
-`match` asks for the Apple ID and for the passphrase of the certificates repository. The release
-lane fetches the certificate read-only and needs no provisioning profile, since the app uses no
-capability that requires one.
+`match` asks for the Apple ID and for the passphrase of the repository. The app uses no capability
+that needs a provisioning profile, so none is created.
 
-**The repository secrets**, read by the release workflow:
+**The secrets** belong to the `release` environment of the repository (Settings → Environments),
+which only jobs running from `main` can use:
 
-| Secret                           | Content                                                        |
-| -------------------------------- | -------------------------------------------------------------- |
-| `FASTLANE_CERTIFICATES_REPO_URL` | HTTPS address of the `match` certificates repository           |
-| `GIT_AUTHORIZATION`              | `user:token` with read access to that repository               |
-| `MATCH_PASSWORD`                 | Passphrase the certificates repository is encrypted with       |
-| `APPLE_KEY_ID`                   | Id of an App Store Connect API key, used for notarization      |
-| `APPLE_ISSUER_ID`                | Issuer id of that key                                          |
-| `APPLE_KEY_CONTENT`              | Content of the key's `.p8` file                                |
-| `TEMP_KEYCHAIN_USER`             | Name for the keychain created for the run                      |
-| `TEMP_KEYCHAIN_PASSWORD`         | Password for that keychain; any value                          |
+| Secret                          | Content                                                       |
+| ------------------------------- | ------------------------------------------------------------- |
+| `MATCH_GIT_URL`                 | HTTPS address of the `match` repository                       |
+| `MATCH_GIT_BASIC_AUTHORIZATION` | `user:token` with read access to that repository              |
+| `MATCH_PASSWORD`                | Passphrase the `match` repository is encrypted with           |
+| `APPLE_KEY_ID`                  | Id of an App Store Connect API key, used for notarization     |
+| `APPLE_ISSUER_ID`               | Issuer id of that key                                         |
+| `APPLE_KEY_CONTENT`             | The key's `.p8` file, Base64 encoded                          |
+| `TEMP_KEYCHAIN_PASSWORD`        | Password for the keychain created for the run; any value      |
 
 ## Trying the packaging locally
 
 `scripts/bundle-app.sh && scripts/make-disk-image.sh` builds the same disk image signed ad hoc.
 It runs on the Mac that built it; elsewhere Gatekeeper refuses it, which is what the Developer ID
-signature and the notarization are for.
+signature and the notarization are for. `scripts/release.sh` needs the secrets above.

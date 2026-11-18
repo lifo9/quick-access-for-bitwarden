@@ -3,6 +3,7 @@ default:
 
 # The gate before a commit: format and lint check, build everything, run all tests.
 check:
+    for script in scripts/*.sh; do bash -n "$script"; done
     swift format lint --strict --recursive Sources Tests Package.swift
     swift build --build-tests
     swift test
@@ -39,7 +40,8 @@ screencast:
 diagnose *arguments:
     swift run QuickAccessForBitwarden --diagnose {{arguments}}
 
-# Tag a release; release.yml signs, notarizes and publishes the disk image.
+# Open the pull request that cuts a release; merging it starts release.yml, which signs,
+# notarizes and publishes the disk image.
 release version:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -52,13 +54,15 @@ release version:
         echo "error: working tree is dirty; commit or stash before releasing" >&2
         exit 1
     fi
+    git fetch --quiet origin main --tags
     if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
         echo "error: tag ${tag} already exists" >&2
         exit 1
     fi
+    git switch --create "release/${tag}" origin/main
     # Edited in place rather than rewritten by a plist tool, which would drop the comments.
     perl -0pi -e 's#(<key>CFBundle(?:ShortVersionString|Version)</key>\s*<string>)[^<]*#${1}{{version}}#g' Bundle/Info.plist
     git add Bundle/Info.plist
     git commit -m "chore(release): ${tag}"
-    git tag "${tag}"
-    git push origin HEAD "${tag}"
+    git push --set-upstream origin "release/${tag}"
+    gh pr create --title "chore(release): ${tag}" --body "Releases ${tag}: merging this publishes the signed, notarized disk image."

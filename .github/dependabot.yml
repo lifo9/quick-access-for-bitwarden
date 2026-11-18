@@ -5,9 +5,15 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # A release has to be a few days old before it is proposed, so that a compromised one is
+    # likely to have been noticed and withdrawn. Security updates are not held back.
+    cooldown:
+      default-days: 3
 
   # fastlane, which signs and notarizes the release.
   - package-ecosystem: "bundler"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 3

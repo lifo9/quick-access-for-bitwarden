@@ -21,7 +21,10 @@ jobs:
     # This image carries the Xcode the app is developed with.
     runs-on: xcode-27
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes; the token is not left behind for later steps.
+          persist-credentials: false
 
       # The image defaults to an older Xcode 27. The format check and the compiler's diagnostics
       # follow the toolchain, so CI uses the version used for development.
@@ -29,6 +32,9 @@ jobs:
         run: sudo xcode-select --switch /Applications/Xcode_27.2.app
 
       # The steps below are the commands of `just check`, one step each.
+      - name: shell scripts parse
+        run: for script in scripts/*.sh; do bash -n "$script"; done
+
       - name: swift format lint
         run: swift format lint --strict --recursive Sources Tests Package.swift
 
@@ -41,3 +47,22 @@ jobs:
       # Not part of `just check`: proves that the release build and the app bundle still assemble.
       - name: bundle the app
         run: scripts/bundle-app.sh
+
+  release-tools:
+    name: release tools install
+    # Dependabot's updates of fastlane merge on a green run, and the release is the only thing
+    # that uses it; this proves the pinned bundle still installs and loads on the release's runner.
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@20eb24b0d509e2b9ed9b6d42ddfeb992915e0564 # v1.341.0
+        with:
+          ruby-version: "3.4.12"
+          bundler-cache: true
+
+      - name: fastlane loads
+        run: bundle exec fastlane --version

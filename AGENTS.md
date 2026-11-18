@@ -7,7 +7,8 @@ the two desktop app internals it depends on.
 
 ## Checks
 
-`just check`: `swift format lint --strict` over `Sources`, `Tests` and `Package.swift`, then
+`just check`: a syntax check of the shell scripts, `swift format lint --strict` over `Sources`,
+`Tests` and `Package.swift`, then
 `swift build --build-tests`, then `swift test`. Run it before every commit. `just format` applies
 the format, `just bundle` builds the `.app`.
 
@@ -16,9 +17,14 @@ CI (`.github/workflows/ci.yml`) runs the same commands, one step each, and then
 development; when that changes, change it in the workflow too, since the format check follows the
 toolchain. A command added to `just check` has to be added to the workflow as well.
 
-`just release X.Y.Z` tags a release; `.github/workflows/release.yml` signs, notarizes and publishes
-it. [docs/releasing.md](docs/releasing.md) has the steps and the one-time setup. The release lane
-cannot be run without the signing secrets; `scripts/bundle-app.sh && scripts/make-disk-image.sh`
+Changes reach `main` only through pull requests, squash-merged after `ci` has passed; Dependabot's
+are merged automatically on that condition (`.github/workflows/dependabot-auto-merge.yml`, which
+relies on the rule for `main` that requires the checks).
+
+`just release X.Y.Z` opens the pull request that sets a new version; merging it makes
+`.github/workflows/release.yml` sign, notarize and publish the disk image.
+[docs/releasing.md](docs/releasing.md) has the steps and the one-time setup. `scripts/release.sh`
+cannot run without the signing secrets; `scripts/bundle-app.sh && scripts/make-disk-image.sh`
 exercises the packaging with an ad hoc signature.
 
 ## Layout
@@ -29,8 +35,8 @@ exercises the packaging with an ad hoc signature.
   `Demo/` holds an invented vault (`--demo`, `just demo`) and the recorder of the README's
   screencast (`just screencast`); rerun the recorder after a change to the panel's look.
 - `Tests/TestSupport`: test vectors and the state file builder, shared by both test targets.
-- `scripts/`, `fastlane/`, `Gemfile`: building the app bundle and the disk image, and the release
-  lane that signs and notarizes them.
+- `scripts/`: building the app bundle and the disk image, and the release that signs and
+  notarizes them. `Gemfile` pins fastlane, which the release uses only to fetch the certificate.
 
 ## Rules
 

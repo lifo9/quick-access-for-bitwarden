@@ -1,49 +1,39 @@
 name: dependabot auto-merge
 
-# Runs after `ci` has finished, from the default branch's copy of this file, so a pull request
-# cannot change what decides about merging it.
-on:
-  workflow_run:
-    workflows: [ci]
-    types: [completed]
+# Switches on auto-merge for Dependabot's pull requests. GitHub then merges each of them by
+# itself once the checks that the rules for main require have passed, and not before.
+on: pull_request
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  merge:
-    name: merge a green Dependabot pull request
-    # Only for a `ci` run that passed, on a pull request, started by Dependabot from a branch of
-    # this repository.
+  enable:
+    name: enable auto-merge
     if: >-
-      github.event.workflow_run.conclusion == 'success'
-      && github.event.workflow_run.event == 'pull_request'
-      && github.event.workflow_run.actor.login == 'dependabot[bot]'
-      && github.event.workflow_run.head_repository.full_name == github.repository
+      github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     steps:
-      - name: merge the pull request that ci passed on
+      # Auto-merge waits for the required checks. Without a rule that requires any, there is
+      # nothing to wait for and the pull request would merge untested, so the rule comes first.
+      - name: check that the base branch requires checks to pass
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
-          TESTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
-          pull_request=$(gh pr list --repo "$REPOSITORY" --head "$HEAD_BRANCH" --state open \
-            --json number,author,headRefOid --jq '.[0]')
-          if [ -z "$pull_request" ] || [ "$pull_request" = "null" ]; then
-            echo "no open pull request for $HEAD_BRANCH"
-            exit 0
+          num_check_rules=$(gh api "repos/$REPOSITORY/rules/branches/$BASE_BRANCH" \
+            --jq '[.[] | select(.type == "required_status_checks")] | length')
+          if [ "$num_check_rules" -eq 0 ]; then
+            echo "error: $BASE_BRANCH has no rule that requires status checks; not enabling auto-merge"
+            exit 1
           fi
-          author=$(jq -r '.author.login' <<<"$pull_request")
-          head_commit=$(jq -r '.headRefOid' <<<"$pull_request")
-          number=$(jq -r '.number' <<<"$pull_request")
-          # The author is checked on the pull request itself, and the commit must be the one ci
-          # tested: a push since then has to pass ci on its own.
-          if [ "$author" != "app/dependabot" ] || [ "$head_commit" != "$TESTED_COMMIT" ]; then
-            echo "not merging #$number: author $author, head $head_commit, tested $TESTED_COMMIT"
-            exit 0
-          fi
-          gh pr merge "$number" --repo "$REPOSITORY" --rebase --match-head-commit "$TESTED_COMMIT"
+
+      - name: enable auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PULL_REQUEST_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PULL_REQUEST_URL"

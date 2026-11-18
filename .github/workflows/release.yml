@@ -1,59 +1,128 @@
 name: release
 
-# `just release X.Y.Z` commits the version, tags it `vX.Y.Z` and pushes; the tag starts this.
+# A release is a merged pull request that changes the app's version (`just release X.Y.Z` opens
+# it). The branch rules allow no direct push to main, so nothing but a reviewed merge starts this.
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
+    paths:
+      - Bundle/Info.plist
+  workflow_dispatch:
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
-# Creating the GitHub release needs write access to the repository's contents.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  plan:
+    name: decide whether there is a release to cut
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_new: ${{ steps.version.outputs.is_new }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # A push releases only when it changed the version: Info.plist also changes for other
+      # reasons, and the first push of the repository must not publish anything. A run started by
+      # hand releases the current version, which is how a failed release is tried again. Either
+      # way a version that already has a release is left alone.
+      - name: read the app's version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_BEFORE_PUSH: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          read_version() {
+            sed -n '/<key>CFBundleShortVersionString<\/key>/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}'
+          }
+          version=$(read_version < Bundle/Info.plist)
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Bundle/Info.plist has no MAJOR.MINOR.PATCH version: '$version'"
+            exit 1
+          fi
+          is_new=true
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            previous_version=""
+            if git fetch --quiet --depth=1 origin "$COMMIT_BEFORE_PUSH" 2>/dev/null; then
+              previous_version=$(git show FETCH_HEAD:Bundle/Info.plist 2>/dev/null | read_version || true)
+            fi
+            if [ -z "$previous_version" ] || [ "$previous_version" = "$version" ]; then
+              echo "this push did not change the version (before: '${previous_version}', now: '$version')"
+              is_new=false
+            fi
+          fi
+          if gh release view "v$version" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            echo "v$version is released already"
+            is_new=false
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "is_new=$is_new" >> "$GITHUB_OUTPUT"
+
   release:
     name: sign + notarize + publish
+    needs: plan
+    if: needs.plan.outputs.is_new == 'true'
     # The same image and Xcode as `ci`, so the released binary is built like the tested one.
     runs-on: xcode-27
+    # The signing secrets belong to this environment, which only runs from main.
+    environment: release
+    permissions:
+      # Creates the tag and the GitHub release.
+      contents: write
+      # Signs the provenance attestation of the disk image.
+      id-token: write
+      attestations: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Select Xcode 27.2
         run: sudo xcode-select --switch /Applications/Xcode_27.2.app
 
-      # The disk image is named after the version in the app; a tag that says something else
-      # would publish a release whose name and contents disagree.
-      - name: check that the tag is the app's version
-        run: |
-          app_version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Bundle/Info.plist)
-          if [ "v$app_version" != "$GITHUB_REF_NAME" ]; then
-            echo "tag $GITHUB_REF_NAME does not match the app's version $app_version"
-            exit 1
-          fi
-
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@20eb24b0d509e2b9ed9b6d42ddfeb992915e0564 # v1.341.0
         with:
-          ruby-version: "3.4"
-          bundler-cache: true
+          ruby-version: "3.4.12"
+          # The job that holds the signing secrets installs its tools afresh instead of taking
+          # them from a cache that an earlier run wrote.
+          bundler-cache: false
+
+      # fastlane, at the versions the lock file pins, for fetching the certificate.
+      - name: install the release tools
+        run: |
+          bundle config set --local frozen true
+          bundle install
 
       - name: sign, notarize and pack the disk image
-        run: bundle exec fastlane mac release
+        run: scripts/release.sh
         env:
-          TEMP_KEYCHAIN_USER: "${{ secrets.TEMP_KEYCHAIN_USER }}"
-          TEMP_KEYCHAIN_PASSWORD: "${{ secrets.TEMP_KEYCHAIN_PASSWORD }}"
-          APPLE_ISSUER_ID: "${{ secrets.APPLE_ISSUER_ID }}"
-          APPLE_KEY_ID: "${{ secrets.APPLE_KEY_ID }}"
-          APPLE_KEY_CONTENT: "${{ secrets.APPLE_KEY_CONTENT }}"
-          FASTLANE_CERTIFICATES_REPO_URL: "${{ secrets.FASTLANE_CERTIFICATES_REPO_URL }}"
-          GIT_AUTHORIZATION: "${{ secrets.GIT_AUTHORIZATION }}"
-          MATCH_PASSWORD: "${{ secrets.MATCH_PASSWORD }}"
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+          APPLE_KEY_CONTENT: ${{ secrets.APPLE_KEY_CONTENT }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          TEMP_KEYCHAIN_PASSWORD: ${{ secrets.TEMP_KEYCHAIN_PASSWORD }}
+
+      # Lets anyone check with `gh attestation verify` that a downloaded image was built by this
+      # workflow from this repository.
+      - name: attest the disk image's provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: build/*.dmg
 
       - name: publish the GitHub release
-        run: gh release create "$GITHUB_REF_NAME" build/*.dmg --title "$GITHUB_REF_NAME" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: gh release create "v$VERSION" build/*.dmg --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes
