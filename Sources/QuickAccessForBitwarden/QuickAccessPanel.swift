@@ -2,14 +2,16 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
-/// A borderless floating panel that takes keyboard input without activating this app, so the app
-/// the user was working in stays in front and gets the focus back when the panel closes. It can
-/// be resized by its edges, down to a minimum size.
+/// A borderless floating panel that can be resized by its edges, down to a minimum size.
+///
+/// It is an ordinary window of an active app, not an overlay above another app: window managers
+/// and assistive apps act on the focused window of the frontmost app, and only then can they
+/// move, resize and describe the panel like any other window.
 private final class FloatingPanel: NSPanel {
     init(contentSize: CGSize, minimumSize: CGSize) {
         super.init(
             contentRect: NSRect(origin: .zero, size: contentSize),
-            styleMask: [.borderless, .nonactivatingPanel, .resizable],
+            styleMask: [.borderless, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -23,6 +25,8 @@ private final class FloatingPanel: NSPanel {
         isMovableByWindowBackground = true
         animationBehavior = .utilityWindow
         minSize = minimumSize
+        // A borderless window shows no title; this is the name other apps list it under.
+        title = "Quick Access for Bitwarden"
     }
 
     // Borderless windows refuse the keyboard focus unless told otherwise.
@@ -31,7 +35,7 @@ private final class FloatingPanel: NSPanel {
     }
 
     override var canBecomeMain: Bool {
-        false
+        true
     }
 }
 
@@ -88,6 +92,7 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
             guard let self, self.panel.isVisible else {
                 return
             }
+            NSApp.activate()
             self.panel.makeKeyAndOrderFront(nil)
         }
         keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] keyDownEvent in
@@ -110,6 +115,7 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
     func show() {
         // Read before the panel opens: this is the app the user summoned the panel from.
         model.prepareForShowing(frontmostAppName: NSWorkspace.shared.frontmostApplication?.localizedName)
+        NSApp.activate()
         panel.makeKeyAndOrderFront(nil)
 
         if !model.session.isUnlocked {
@@ -121,6 +127,8 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
 
     func hide() {
         panel.orderOut(nil)
+        // Hiding the app hands the keyboard back to the app the panel was opened from.
+        NSApp.hide(nil)
     }
 
     func windowDidResignKey(_ notification: Notification) {
