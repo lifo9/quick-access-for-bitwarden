@@ -2,38 +2,57 @@ name: dependabot auto-merge
 
 # Switches on auto-merge for Dependabot's pull requests. GitHub then merges each of them by
 # itself once the checks that the rules for main require have passed, and not before.
-on: pull_request
+#
+# `pull_request_target` runs this file as it is on main, whatever the pull request changes, with
+# a token that may merge. That is safe here because the pull request's code is never checked out
+# or run.
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  enable:
+  auto-merge:
     name: enable auto-merge
     if: >-
       github.event.pull_request.user.login == 'dependabot[bot]'
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     steps:
-      # Auto-merge waits for the required checks. Without a rule that requires any, there is
-      # nothing to wait for and the pull request would merge untested, so the rule comes first.
-      - name: check that the base branch requires checks to pass
+      - name: enable auto-merge for a pull request that is Dependabot's alone
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          # The name of the job in ci.yml that builds and tests.
+          REQUIRED_CHECK: lint + build + test
         run: |
           set -euo pipefail
-          num_check_rules=$(gh api "repos/$REPOSITORY/rules/branches/$BASE_BRANCH" \
-            --jq '[.[] | select(.type == "required_status_checks")] | length')
-          if [ "$num_check_rules" -eq 0 ]; then
-            echo "error: $BASE_BRANCH has no rule that requires status checks; not enabling auto-merge"
+
+          # Auto-merge waits for the required checks. If the rules for the base branch do not
+          # require the build and test job, there is nothing to wait for and the pull request
+          # would merge untested.
+          required_checks=$(gh api "repos/$REPOSITORY/rules/branches/$BASE_BRANCH" \
+            --jq '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | join("\n")')
+          if ! grep -Fxq "$REQUIRED_CHECK" <<<"$required_checks"; then
+            echo "error: $BASE_BRANCH does not require the check '$REQUIRED_CHECK'; not enabling auto-merge"
             exit 1
           fi
 
-      - name: enable auto-merge
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PULL_REQUEST_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge --auto --squash "$PULL_REQUEST_URL"
+          # A commit by anyone else turns this into a change that a person has to look at.
+          other_authors=$(gh api "repos/$REPOSITORY/pulls/$PULL_REQUEST_NUMBER/commits" --paginate \
+            --jq '.[] | (.author.login // "unknown")' | grep -Fxv "dependabot[bot]" | sort -u | paste -sd, - || true)
+          if [ -n "$other_authors" ]; then
+            echo "commits by $other_authors: leaving #$PULL_REQUEST_NUMBER to a person"
+            gh pr merge --disable-auto "$PULL_REQUEST_NUMBER" --repo "$REPOSITORY" || true
+            exit 0
+          fi
+
+          gh pr merge --auto --squash "$PULL_REQUEST_NUMBER" --repo "$REPOSITORY"

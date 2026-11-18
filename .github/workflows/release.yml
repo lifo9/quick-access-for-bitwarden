@@ -41,6 +41,11 @@ jobs:
           COMMIT_BEFORE_PUSH: ${{ github.event.before }}
         run: |
           set -euo pipefail
+          # A run started by hand can be given any branch; only main is ever released.
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "releases are cut from main, not from $GITHUB_REF_NAME"
+            exit 1
+          fi
           read_version() {
             sed -n '/<key>CFBundleShortVersionString<\/key>/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}'
           }
@@ -51,13 +56,17 @@ jobs:
           fi
           is_new=true
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            previous_version=""
-            if git fetch --quiet --depth=1 origin "$COMMIT_BEFORE_PUSH" 2>/dev/null; then
-              previous_version=$(git show FETCH_HEAD:Bundle/Info.plist 2>/dev/null | read_version || true)
-            fi
-            if [ -z "$previous_version" ] || [ "$previous_version" = "$version" ]; then
-              echo "this push did not change the version (before: '${previous_version}', now: '$version')"
+            if printf '%s' "$COMMIT_BEFORE_PUSH" | grep -Eq '^0+$'; then
+              echo "the first push of the branch releases nothing"
               is_new=false
+            else
+              # Not being able to tell must fail the run: skipping quietly would lose a release.
+              git fetch --quiet --depth=1 origin "$COMMIT_BEFORE_PUSH"
+              previous_version=$(git show FETCH_HEAD:Bundle/Info.plist 2>/dev/null | read_version || true)
+              if [ "$previous_version" = "$version" ]; then
+                echo "this push did not change the version $version"
+                is_new=false
+              fi
             fi
           fi
           if gh release view "v$version" --repo "$REPOSITORY" >/dev/null 2>&1; then
@@ -73,6 +82,8 @@ jobs:
     if: needs.plan.outputs.is_new == 'true'
     # The same image and Xcode as `ci`, so the released binary is built like the tested one.
     runs-on: xcode-27
+    # Notarization usually takes minutes; a stalled one must not hold the runner for hours.
+    timeout-minutes: 90
     # The signing secrets belong to this environment, which only runs from main.
     environment: release
     permissions:

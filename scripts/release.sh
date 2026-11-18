@@ -37,14 +37,16 @@ trap clean_up EXIT
 echo "==> Creating a keychain for this run"
 security delete-keychain "$keychain_file" 2>/dev/null || true
 security create-keychain -p "$TEMP_KEYCHAIN_PASSWORD" "$keychain_file"
-security set-keychain-settings -u -t 3600 "$keychain_file"
+# Without a timeout: the keychain must not lock itself while notarization is being waited for.
+security set-keychain-settings "$keychain_file"
 security unlock-keychain -p "$TEMP_KEYCHAIN_PASSWORD" "$keychain_file"
 # codesign only finds identities in keychains that are on the search list.
 existing_keychains=()
 while IFS= read -r existing_keychain; do
     existing_keychains+=("$existing_keychain")
 done < <(security list-keychains -d user | sed -e 's/^ *"//' -e 's/"$//')
-security list-keychains -d user -s "$keychain_file" "${existing_keychains[@]}"
+# Written this way because the bash of macOS treats an empty array as an unset variable.
+security list-keychains -d user -s "$keychain_file" ${existing_keychains[@]+"${existing_keychains[@]}"}
 
 echo "==> Fetching the Developer ID certificate"
 # fastlane match is used for this one step: the certificate is stored in its repository format.
@@ -79,7 +81,7 @@ notarize() {
     local submission_file="$1"
     local submission
     submission="$(xcrun notarytool submit "$submission_file" --key "$api_key_file" \
-        --key-id "$APPLE_KEY_ID" --issuer "$APPLE_ISSUER_ID" --wait --output-format json)"
+        --key-id "$APPLE_KEY_ID" --issuer "$APPLE_ISSUER_ID" --wait --timeout 30m --output-format json)"
     local submission_status
     submission_status="$(jq -r '.status' <<<"$submission")"
     if [ "$submission_status" != "Accepted" ]; then

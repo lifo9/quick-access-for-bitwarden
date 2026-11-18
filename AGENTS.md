@@ -19,7 +19,8 @@ toolchain. A command added to `just check` has to be added to the workflow as we
 
 Changes reach `main` only through pull requests, squash-merged after `ci` has passed; Dependabot's
 are merged automatically on that condition (`.github/workflows/dependabot-auto-merge.yml`, which
-relies on the rule for `main` that requires the checks).
+refuses unless the rules for `main` require the job named `lint + build + test`; renaming that job
+means changing the workflow and the rule with it).
 
 `just release X.Y.Z` opens the pull request that sets a new version; merging it makes
 `.github/workflows/release.yml` sign, notarize and publish the disk image.
