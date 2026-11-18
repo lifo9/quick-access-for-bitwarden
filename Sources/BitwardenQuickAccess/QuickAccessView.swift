@@ -3,6 +3,10 @@ import SwiftUI
 
 struct QuickAccessView: View {
     static let panelSize = CGSize(width: 640, height: 420)
+    /// The large, continuous corners of the system's own search panel.
+    static let cornerRadius: CGFloat = 26
+    /// Keeps the content clear of the rounded corners.
+    private static let horizontalInset: CGFloat = 22
     private static let rowHeight: CGFloat = 46
 
     let model: QuickAccessModel
@@ -11,17 +15,24 @@ struct QuickAccessView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-                .frame(height: 56)
-                .padding(.horizontal, 18)
+                .frame(height: 58)
+                .padding(.horizontal, Self.horizontalInset)
             Divider()
+                .padding(.horizontal, Self.horizontalInset)
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
+                .padding(.horizontal, Self.horizontalInset)
             footer
-                .frame(height: 30)
-                .padding(.horizontal, 18)
+                .frame(height: 34)
+                .padding(.horizontal, Self.horizontalInset)
         }
         .frame(width: Self.panelSize.width, height: Self.panelSize.height)
+        .overlay {
+            // A hairline around the panel, which sets it apart from dark content behind it.
+            RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+                .strokeBorder(.primary.opacity(0.18), lineWidth: 1)
+        }
         .onChange(of: model.focusRequestCount, initial: true) {
             isSearchFieldFocused = true
         }
@@ -218,11 +229,11 @@ private struct SelectableList<RowContent: View>: View {
                     ForEach(Array(rowIds.enumerated()), id: \.element) { rowIndex, rowId in
                         let isSelected = rowIndex == selectedRowIndex
                         rowContent(rowIndex, isSelected)
-                            .padding(.horizontal, 10)
+                            .padding(.horizontal, 12)
                             .frame(height: rowHeight)
                             .foregroundStyle(isSelected ? .white : .primary)
                             .background(
-                                RoundedRectangle(cornerRadius: 8)
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
                                     .fill(isSelected ? Color.accentColor : .clear)
                             )
                             .contentShape(Rectangle())
@@ -230,7 +241,7 @@ private struct SelectableList<RowContent: View>: View {
                             .id(rowId)
                     }
                 }
-                .padding(8)
+                .padding(10)
             }
             .onChange(of: selectedRowIndex) {
                 guard rowIds.indices.contains(selectedRowIndex) else {

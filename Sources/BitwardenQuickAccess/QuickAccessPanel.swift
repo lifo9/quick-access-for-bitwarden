@@ -36,8 +36,6 @@ private final class FloatingPanel: NSPanel {
 /// Shows and hides the quick access panel and turns key presses into commands of the model.
 @MainActor
 final class QuickAccessPanelController: NSObject, NSWindowDelegate {
-    private static let cornerRadius: CGFloat = 14
-
     private let model: QuickAccessModel
     private let panel = FloatingPanel(contentSize: QuickAccessView.panelSize)
     private var keyDownMonitor: Any?
@@ -51,7 +49,8 @@ final class QuickAccessPanelController: NSObject, NSWindowDelegate {
         background.blendingMode = .behindWindow
         background.state = .active
         background.wantsLayer = true
-        background.layer?.cornerRadius = Self.cornerRadius
+        background.layer?.cornerRadius = QuickAccessView.cornerRadius
+        background.layer?.cornerCurve = .continuous
         background.layer?.masksToBounds = true
 
         let hostingView = NSHostingView(rootView: QuickAccessView(model: model))
