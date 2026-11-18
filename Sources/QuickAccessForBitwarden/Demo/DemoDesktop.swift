@@ -11,6 +11,7 @@ final class DemoDesktop: DesktopAccess {
         let username: String
         let website: String
         var isFavorite = false
+        var requiresMasterPasswordReprompt = false
     }
 
     private static let userId = "demo-account"
@@ -21,7 +22,9 @@ final class DemoDesktop: DesktopAccess {
     private static let logins = [
         DemoLogin(
             name: "Acme Cloud", username: "alex@example.com", website: "https://cloud.acme.example", isFavorite: true),
-        DemoLogin(name: "Harbor Bank", username: "alex.morgan", website: "https://harborbank.example/login"),
+        DemoLogin(
+            name: "Harbor Bank", username: "alex.morgan", website: "https://harborbank.example/login",
+            requiresMasterPasswordReprompt: true),
         DemoLogin(name: "Lumen Energy", username: "customer-1002345", website: "https://lumen.example"),
         DemoLogin(name: "Nimbus Mail", username: "alex@nimbus.example", website: "https://mail.nimbus.example"),
         DemoLogin(name: "Orbit Travel", username: "alex@example.com", website: "https://orbit.example"),
@@ -31,12 +34,16 @@ final class DemoDesktop: DesktopAccess {
     ]
 
     private let userKey: SymmetricCryptoKey
-    private let stateFile: Data
+    /// How long the pretend Touch ID prompt stays up before it is confirmed.
+    private let touchIdDuration: Duration
+    private var stateFile: Data
+    private var stateFileModificationDate = Date(timeIntervalSince1970: 0)
 
-    init() throws {
+    init(touchIdDuration: Duration = .zero) throws {
         userKey = try SymmetricCryptoKey(
             encodedKey: RandomBytes.generate(count: SymmetricCryptoKey.encodedByteCount))
-        stateFile = try Self.makeStateFile(userKey: userKey)
+        self.touchIdDuration = touchIdDuration
+        stateFile = try Self.makeStateFile(userKey: userKey, desktopLocale: nil)
     }
 
     func loadState() throws -> DesktopState {
@@ -44,17 +51,26 @@ final class DemoDesktop: DesktopAccess {
     }
 
     func readStateModificationDate() throws -> Date? {
-        // The demo vault never changes.
-        Date(timeIntervalSince1970: 0)
+        stateFileModificationDate
     }
 
     func requestUnlock(userId: String) async throws -> BiometricUnlockOutcome {
-        .unlocked(userKey)
+        try await Task.sleep(for: touchIdDuration)
+        return .unlocked(userKey)
+    }
+
+    /// Rewrites the state file the way choosing a language in the desktop app's settings does.
+    func chooseLanguage(desktopLocale: String) throws {
+        stateFile = try Self.makeStateFile(userKey: userKey, desktopLocale: desktopLocale)
+        stateFileModificationDate = stateFileModificationDate.addingTimeInterval(1)
     }
 
     /// A state file in the desktop app's format, so the demo runs through the same reading and
     /// decryption as a real vault.
-    private static func makeStateFile(userKey: SymmetricCryptoKey) throws -> Data {
+    ///
+    /// - Parameter desktopLocale: The language chosen in the desktop app; `nil` when it follows
+    ///   the system.
+    private static func makeStateFile(userKey: SymmetricCryptoKey, desktopLocale: String?) throws -> Data {
         func encrypt(_ text: String) throws -> String {
             try SymmetricCipher.encrypt(
                 Data(text.utf8),
@@ -69,6 +85,7 @@ final class DemoDesktop: DesktopAccess {
                 "type": 1,
                 "name": try encrypt(login.name),
                 "favorite": login.isFavorite,
+                "reprompt": login.requiresMasterPasswordReprompt ? 1 : 0,
                 "login": [
                     "username": try encrypt(login.username),
                     "password": try encrypt("correct-horse-battery-staple-\(loginIndex)"),
@@ -101,7 +118,7 @@ final class DemoDesktop: DesktopAccess {
         let ciphersById = Dictionary(
             uniqueKeysWithValues: loginCiphers + [("demo-note", secureNote), ("demo-card", card)])
 
-        let state: [String: Any] = [
+        let accountState: [String: Any] = [
             "global_account_activeAccountId": userId,
             // No organization is involved, so the RSA key is never imported; any value will do.
             "user_\(userId)_crypto_accountCryptographicState": ["V1": ["private_key": try encrypt("unused")]],
@@ -112,6 +129,8 @@ final class DemoDesktop: DesktopAccess {
                 "region": "Self-hosted", "urls": ["base": "https://demo.invalid"],
             ],
         ]
+        let languageState: [String: Any] = desktopLocale.map { ["global_translation_locale": $0] } ?? [:]
+        let state = accountState.merging(languageState) { accountValue, _ in accountValue }
         return try JSONSerialization.data(withJSONObject: state)
     }
 }

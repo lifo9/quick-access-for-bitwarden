@@ -13,7 +13,8 @@ if launchArguments.contains("--diagnose") {
 
 let application = NSApplication.shared
 
-// `--record-demo <path prefix>` writes the screencast of the README and exits.
+// `--record-demo <path prefix>` writes the screencast of the README and exits. It is run from the
+// repository's root, where it finds the app's icon.
 if let flagIndex = launchArguments.firstIndex(of: "--record-demo") {
     guard launchArguments.indices.contains(flagIndex + 1) else {
         print("usage: --record-demo <output path prefix>")

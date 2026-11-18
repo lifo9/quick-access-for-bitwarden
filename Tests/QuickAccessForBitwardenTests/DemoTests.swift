@@ -7,7 +7,7 @@ import XCTest
 
 @MainActor
 final class DemoTests: XCTestCase {
-    func test_DemoDesktop__unlocksIntoAVaultWhoseEveryValueCanBeRead() async throws {
+    func test_DemoDesktop__unlocksIntoAVaultWhoseUnprotectedValuesCanBeRead() async throws {
         let desktop = try DemoDesktop()
         let state = try desktop.loadState()
         guard case .unlocked(let userKey) = try await desktop.requestUnlock(userId: state.userId) else {
@@ -18,8 +18,9 @@ final class DemoTests: XCTestCase {
 
         XCTAssertEqual(vault.numUndecryptableItems, 0)
         XCTAssertEqual(Set(vault.items.map(\.kind)), [.login, .secureNote, .card])
-        for item in vault.items {
-            XCTAssertFalse(item.name.isEmpty)
+        XCTAssertFalse(vault.items.contains { $0.name.isEmpty })
+        // What an item with master password re-prompt releases has a test of its own.
+        for item in vault.items where !item.requiresMasterPasswordReprompt {
             for field in item.fields {
                 XCTAssertNoThrow(try item.revealValue(of: field), "\(item.name): \(field.name)")
             }
@@ -28,6 +29,51 @@ final class DemoTests: XCTestCase {
             }
         }
         XCTAssertNotNil(state.settings.websiteIconServerUrl)
+    }
+
+    func test_DemoDesktop__hasAnItemThatKeepsItsSecretsBehindTheMasterPassword() async throws {
+        let desktop = try DemoDesktop()
+        let state = try desktop.loadState()
+        guard case .unlocked(let userKey) = try await desktop.requestUnlock(userId: state.userId) else {
+            return XCTFail("the demo vault did not unlock")
+        }
+
+        let vault = try VaultDecryptor.unlock(state, userKey: userKey)
+
+        let protectedItem = try XCTUnwrap(vault.items.first(where: \.requiresMasterPasswordReprompt))
+        for secretRole in [VaultFieldRole.password, .oneTimeCode] {
+            let secretField = try XCTUnwrap(protectedItem.firstField(withRole: secretRole))
+            XCTAssertThrowsError(try protectedItem.revealValue(of: secretField)) { thrownError in
+                XCTAssertEqual(thrownError as? VaultError, .masterPasswordRepromptRequired)
+            }
+        }
+        for listedRole in [VaultFieldRole.username, .website] {
+            let listedField = try XCTUnwrap(protectedItem.firstField(withRole: listedRole))
+            XCTAssertNoThrow(try protectedItem.revealValue(of: listedField))
+        }
+    }
+
+    func test_DemoDesktop_requestUnlock__takesAsLongAsThePretendTouchIdPrompt() async throws {
+        let desktop = try DemoDesktop(touchIdDuration: .milliseconds(200))
+        let userId = try desktop.loadState().userId
+        let clock = ContinuousClock()
+
+        let unlockDuration = try await clock.measure {
+            _ = try await desktop.requestUnlock(userId: userId)
+        }
+
+        XCTAssertGreaterThanOrEqual(unlockDuration, .milliseconds(200))
+    }
+
+    func test_DemoDesktop_chooseLanguage__makesTheStateNewerAndInThatLanguage() throws {
+        let desktop = try DemoDesktop()
+        let modificationDateBefore = try XCTUnwrap(desktop.readStateModificationDate())
+        XCTAssertNil(try desktop.loadState().settings.desktopLocale)
+
+        try desktop.chooseLanguage(desktopLocale: "sk")
+
+        XCTAssertEqual(try desktop.loadState().settings.desktopLocale, "sk")
+        XCTAssertGreaterThan(try XCTUnwrap(desktop.readStateModificationDate()), modificationDateBefore)
     }
 
     func test_DemoIcons_makeIconData__drawsAnImageForAWebsite() async throws {
@@ -44,7 +90,12 @@ final class DemoTests: XCTestCase {
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: outputDirectory) }
 
-        try await DemoRecorder.record(outputPathPrefix: outputDirectory.appending(path: "screencast").path)
+        // Every step of the script checks that the demo is where its caption says, so a script
+        // that no longer matches the app fails here instead of recording something else.
+        try await DemoRecorder.record(
+            outputPathPrefix: outputDirectory.appending(path: "screencast").path,
+            appIconPath: Self.repositoryRoot.appending(path: DemoRecorder.defaultAppIconPath).path
+        )
 
         for appearance in ["dark", "light"] {
             let gifFile = outputDirectory.appending(path: "screencast-\(appearance).gif")
@@ -52,4 +103,19 @@ final class DemoTests: XCTestCase {
             XCTAssertGreaterThan(CGImageSourceGetCount(animation), 5)
         }
     }
+
+    func test_DemoRecorder_record__failsWithoutTheAppIcon() async throws {
+        let missingIconPath = "/nonexistent/AppIcon.icns"
+
+        do {
+            try await DemoRecorder.record(outputPathPrefix: "/nonexistent/screencast", appIconPath: missingIconPath)
+            XCTFail("the recording did not fail")
+        } catch DemoRecorder.RecordingError.appIconNotFound(let reportedPath) {
+            XCTAssertEqual(reportedPath, missingIconPath)
+        }
+    }
+
+    /// The tests may be run from any directory; the icon is found from where this file is.
+    private static let repositoryRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 }
