@@ -478,16 +478,17 @@ final class QuickAccessModelTests: XCTestCase {
         XCTAssertNotNil(harness.model.iconStore.icon(at: iconUrl))
     }
 
-    func test_loadIcon__doesNotRepeatARequestThatFailed() async throws {
+    func test_loadIcon__triesARequestThatFailedOnceMoreAndThenGivesUp() async throws {
         let harness = try await makeUnlockedHarness(settings: makeIconSettings())
         let iconUrl = try XCTUnwrap(harness.model.websiteIconUrl(of: XCTUnwrap(harness.model.selectedItem)))
         harness.iconService.setResponseData(nil)
 
-        await harness.model.iconStore.loadIcon(at: iconUrl)
-        await harness.model.iconStore.loadIcon(at: iconUrl)
+        for _ in 0..<4 {
+            await harness.model.iconStore.loadIcon(at: iconUrl)
+        }
 
         XCTAssertNil(harness.model.iconStore.icon(at: iconUrl))
-        XCTAssertEqual(harness.iconService.requestedUrls.count, 1)
+        XCTAssertEqual(harness.iconService.requestedUrls.count, 2)
     }
 
     func test_loadIcon__ignoresAnAnswerThatIsNotAnImage() async throws {
@@ -496,8 +497,11 @@ final class QuickAccessModelTests: XCTestCase {
         harness.iconService.setResponseData(Data("<html>not found</html>".utf8))
 
         await harness.model.iconStore.loadIcon(at: iconUrl)
+        await harness.model.iconStore.loadIcon(at: iconUrl)
 
         XCTAssertNil(harness.model.iconStore.icon(at: iconUrl))
+        // An answer that is no icon is final; asking again would get the same.
+        XCTAssertEqual(harness.iconService.requestedUrls.count, 1)
     }
 
     func test_lock__forgetsTheWebsiteIcons() async throws {
@@ -547,6 +551,19 @@ final class QuickAccessModelTests: XCTestCase {
         ])
 
         harness.clock.advance(bySeconds: 61)
+        harness.model.copyPassword()
+
+        XCTAssertNil(harness.copiedText)
+        XCTAssertFalse(harness.session.isUnlocked)
+    }
+
+    func test_copyPassword__locksWhenTheSystemHasBeenIdleLongerThanTheDesktopAppAllows() async throws {
+        let harness = try await makeUnlockedHarness(settings: [
+            StateFileBuilder.settingKey("vaultTimeoutSettings_vaultTimeout"): "onIdle"
+        ])
+
+        // The periodic check is late; a use of the vault has to apply the timeout by itself.
+        harness.clock.systemIdleSeconds = 600
         harness.model.copyPassword()
 
         XCTAssertNil(harness.copiedText)

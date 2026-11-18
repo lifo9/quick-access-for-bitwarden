@@ -34,8 +34,7 @@ final class VaultSession {
     private var unlockedUserId: String?
     private var stateFileModificationDate: Date?
     private var lastUseDate: Date
-    /// When the Mac went to sleep, and how long it had been without input by then.
-    private var sleepStart: (date: Date, systemIdleSeconds: TimeInterval)?
+    private var idleTracker = IdleTracker()
     private var periodicCheck: Timer?
 
     /// - Parameters:
@@ -156,22 +155,17 @@ final class VaultSession {
     }
 
     func systemWillSleep() {
-        sleepStart = (currentDate(), readSystemIdleSeconds())
+        idleTracker.systemWillSleep(at: currentDate(), systemIdleSeconds: readSystemIdleSeconds())
         handle(.systemWillSleep)
     }
 
     /// No periodic check runs while the Mac sleeps, and the key press that wakes it resets the
-    /// system's idle time. The time before the sleep and the sleep itself are therefore counted
-    /// here as the one idle period they are.
+    /// system's idle time, so the idle time is judged here as it stood at the moment of waking.
     func systemDidWake() {
-        guard let sleepStart else {
-            return
-        }
-        self.sleepStart = nil
         let now = currentDate()
         handle(
             .periodicCheck(
-                systemIdleSeconds: sleepStart.systemIdleSeconds + now.timeIntervalSince(sleepStart.date),
+                systemIdleSeconds: idleTracker.systemDidWake(at: now),
                 secondsSinceLastUse: now.timeIntervalSince(lastUseDate)
             ))
     }
@@ -179,10 +173,11 @@ final class VaultSession {
     /// Locks the vault if the vault timeout has passed. Runs periodically, and whenever the
     /// panel is about to use the vault.
     func enforceVaultTimeout() {
+        let now = currentDate()
         handle(
             .periodicCheck(
-                systemIdleSeconds: readSystemIdleSeconds(),
-                secondsSinceLastUse: currentDate().timeIntervalSince(lastUseDate)
+                systemIdleSeconds: idleTracker.idleSeconds(at: now, systemIdleSeconds: readSystemIdleSeconds()),
+                secondsSinceLastUse: now.timeIntervalSince(lastUseDate)
             ))
     }
 
