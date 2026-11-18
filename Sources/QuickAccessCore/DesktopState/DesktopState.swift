@@ -92,7 +92,9 @@ private struct StateFile: Decodable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: StateKey.self)
-        guard let userId = try container.decodeIfPresent(String.self, forKey: StateKey("global_account_activeAccountId")) else {
+        guard
+            let userId = try container.decodeIfPresent(String.self, forKey: StateKey("global_account_activeAccountId"))
+        else {
             throw DesktopStateError.noActiveAccount
         }
 
@@ -112,10 +114,11 @@ private struct StateFile: Decodable {
             throw DesktopStateError.unsupportedAccountEncryption
         }
         let ciphersById = try decodeRequired([String: EncryptedCipher].self, "ciphers_ciphers")
-        let organizationKeysByOrganizationId = try container.decodeIfPresent(
-            [String: EncryptedOrganizationKey].self,
-            forKey: userStateKey("crypto_organizationKeys")
-        ) ?? [:]
+        let organizationKeysByOrganizationId =
+            try container.decodeIfPresent(
+                [String: EncryptedOrganizationKey].self,
+                forKey: userStateKey("crypto_organizationKeys")
+            ) ?? [:]
 
         let storedVaultTimeout = try container.decodeIfPresent(
             StoredVaultTimeout.self,
@@ -125,10 +128,11 @@ private struct StateFile: Decodable {
             String.self,
             forKey: userStateKey("autofillSettingsLocal_clearClipboardDelay")
         )
-        let isBiometricUnlockEnabled = try container.decodeIfPresent(
-            Bool.self,
-            forKey: userStateKey("biometricSettings_biometricUnlockEnabled")
-        ) ?? false
+        let isBiometricUnlockEnabled =
+            try container.decodeIfPresent(
+                Bool.self,
+                forKey: userStateKey("biometricSettings_biometricUnlockEnabled")
+            ) ?? false
 
         desktopState = DesktopState(
             userId: userId,

@@ -1,6 +1,7 @@
 import Foundation
-@testable import QuickAccessCore
 import XCTest
+
+@testable import QuickAccessCore
 
 final class VaultSearchTests: XCTestCase {
     private func makeItem(

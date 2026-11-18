@@ -31,11 +31,13 @@ public enum RsaCipher {
             kSecAttrKeyClass: kSecAttrKeyClassPrivate,
         ]
         var unmanagedError: Unmanaged<CFError>?
-        guard let securityKey = SecKeyCreateWithData(
-            pkcs1PrivateKey as CFData,
-            attributes as CFDictionary,
-            &unmanagedError
-        ) else {
+        guard
+            let securityKey = SecKeyCreateWithData(
+                pkcs1PrivateKey as CFData,
+                attributes as CFDictionary,
+                &unmanagedError
+            )
+        else {
             _ = unmanagedError?.takeRetainedValue()
             throw CryptoError.malformedPrivateKey
         }
@@ -46,22 +48,24 @@ public enum RsaCipher {
         let algorithm: SecKeyAlgorithm
         let ciphertext: Data
         switch encrypted {
-        case let .rsa2048OaepSha1(rsaCiphertext):
+        case .rsa2048OaepSha1(let rsaCiphertext):
             algorithm = .rsaEncryptionOAEPSHA1
             ciphertext = rsaCiphertext
-        case let .rsa2048OaepSha256(rsaCiphertext):
+        case .rsa2048OaepSha256(let rsaCiphertext):
             algorithm = .rsaEncryptionOAEPSHA256
             ciphertext = rsaCiphertext
         case .aesCbc256HmacSha256:
             throw CryptoError.unsupportedEncryptionType("symmetric value given to the RSA cipher")
         }
         var unmanagedError: Unmanaged<CFError>?
-        guard let plaintext = SecKeyCreateDecryptedData(
-            privateKey.securityKey,
-            algorithm,
-            ciphertext as CFData,
-            &unmanagedError
-        ) else {
+        guard
+            let plaintext = SecKeyCreateDecryptedData(
+                privateKey.securityKey,
+                algorithm,
+                ciphertext as CFData,
+                &unmanagedError
+            )
+        else {
             throw CryptoError.rsaOperationFailed(describe(unmanagedError))
         }
         return plaintext as Data
@@ -79,7 +83,7 @@ public enum RsaCipher {
             throw CryptoError.rsaOperationFailed(describe(unmanagedError))
         }
         guard let publicKey = SecKeyCopyPublicKey(securityKey),
-              let pkcs1PublicKey = SecKeyCopyExternalRepresentation(publicKey, &unmanagedError)
+            let pkcs1PublicKey = SecKeyCopyExternalRepresentation(publicKey, &unmanagedError)
         else {
             throw CryptoError.rsaOperationFailed(describe(unmanagedError))
         }

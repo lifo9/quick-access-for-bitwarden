@@ -68,7 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         menu.autoenablesItems = false
-        let openMenuItem = NSMenuItem(title: "Open Quick Access", action: #selector(openQuickAccess), keyEquivalent: " ")
+        let openMenuItem = NSMenuItem(
+            title: "Open Quick Access", action: #selector(openQuickAccess), keyEquivalent: " ")
         openMenuItem.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(openMenuItem)
         if let hotKeyFailure {

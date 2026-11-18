@@ -11,10 +11,14 @@ enum Diagnostics {
             let desktop = InstalledDesktopApp()
             let state = try desktop.loadState()
             print("state file:        \(try desktop.locateStateFile().path)")
-            print("vault items:       \(state.ciphers.count) stored, \(state.organizationKeysByOrganizationId.count) organization keys")
+            print(
+                "vault items:       \(state.ciphers.count) stored, \(state.organizationKeysByOrganizationId.count) organization keys"
+            )
             print("vault timeout:     \(state.settings.vaultTimeout)")
             print("clipboard clear:   \(state.settings.clipboardClearDelay)")
-            print("biometric unlock:  \(state.settings.isBiometricUnlockEnabled ? "enabled" : "disabled") in the desktop app")
+            print(
+                "biometric unlock:  \(state.settings.isBiometricUnlockEnabled ? "enabled" : "disabled") in the desktop app"
+            )
             print("desktop proxy:     \(try desktop.locateProxyExecutable().path)")
 
             let status = try await desktop.requestBiometricsStatus(userId: state.userId)
@@ -25,7 +29,7 @@ enum Diagnostics {
             }
             print("requesting unlock: confirm the Touch ID prompt shown by Bitwarden")
             let outcome = try await desktop.requestUnlock(userId: state.userId)
-            guard case let .unlocked(userKey) = outcome else {
+            guard case .unlocked(let userKey) = outcome else {
                 print("unlock outcome:    \(outcome)")
                 return 1
             }
@@ -46,7 +50,8 @@ enum Diagnostics {
             (try? item.revealValue(of: field)).flatMap { try? TotpConfiguration(authenticatorKey: $0) } != nil
         }
         print("unlock outcome:    unlocked")
-        print("decrypted items:   \(vault.items.count) (\(numItemsByKind)), \(vault.numUndecryptableItems) undecryptable")
+        print(
+            "decrypted items:   \(vault.items.count) (\(numItemsByKind)), \(vault.numUndecryptableItems) undecryptable")
         print("fields:            \(numRevealableFields) of \(fieldsWithItems.count) can be revealed")
         print("one-time codes:    \(numUsableOneTimeCodes) of \(oneTimeCodeFields.count) can be generated")
         print("re-prompt items:   \(vault.items.count { $0.requiresMasterPasswordReprompt })")

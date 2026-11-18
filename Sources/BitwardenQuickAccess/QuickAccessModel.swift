@@ -61,7 +61,7 @@ final class QuickAccessModel {
     }
 
     var actions: [ItemAction] {
-        guard case let .actions(item) = mode else {
+        guard case .actions(let item) = mode else {
             return []
         }
         return Self.makeActions(for: item)
@@ -119,7 +119,7 @@ final class QuickAccessModel {
                 return
             }
             perform(.copy(defaultField), on: item)
-        case let .actions(item):
+        case .actions(let item):
             let actions = actions
             guard actions.indices.contains(selectedActionIndex) else {
                 return
@@ -194,7 +194,7 @@ final class QuickAccessModel {
 
     /// The item the keyboard shortcuts act on in either mode.
     private var currentItem: VaultItem? {
-        if case let .actions(item) = mode {
+        if case .actions(let item) = mode {
             return item
         }
         return selectedItem
@@ -214,9 +214,10 @@ final class QuickAccessModel {
     private func perform(_ effect: ItemAction.Effect, on item: VaultItem) {
         do {
             switch effect {
-            case let .copy(field):
+            case .copy(let field):
                 let revealedValue = try item.revealValue(of: field)
-                let textToCopy = field.role == .oneTimeCode
+                let textToCopy =
+                    field.role == .oneTimeCode
                     ? TotpGenerator.generateCode(
                         configuration: try TotpConfiguration(authenticatorKey: revealedValue),
                         at: Date()
@@ -227,7 +228,7 @@ final class QuickAccessModel {
                     isConcealed: field.isConcealed,
                     clearDelay: session.settings.clipboardClearDelay
                 )
-            case let .openWebsite(field):
+            case .openWebsite(let field):
                 guard let websiteUrl = Self.makeWebsiteUrl(try item.revealValue(of: field)) else {
                     notice = "This website address cannot be opened in a browser."
                     return
@@ -247,7 +248,7 @@ final class QuickAccessModel {
     }
 
     private func refreshMatchingItems() {
-        guard case let .unlocked(vault) = session.state else {
+        guard case .unlocked(let vault) = session.state else {
             matchingItems = []
             selectedItemIndex = 0
             mode = .items
@@ -270,9 +271,9 @@ final class QuickAccessModel {
     private static func makeWebsiteUrl(_ website: String) -> URL? {
         let hasScheme = website.contains("://")
         guard let websiteUrl = URL(string: hasScheme ? website : "https://\(website)"),
-              let scheme = websiteUrl.scheme?.lowercased(),
-              ["http", "https"].contains(scheme),
-              websiteUrl.host() != nil
+            let scheme = websiteUrl.scheme?.lowercased(),
+            ["http", "https"].contains(scheme),
+            websiteUrl.host() != nil
         else {
             return nil
         }
@@ -293,17 +294,20 @@ final class QuickAccessModel {
                     ItemAction(id: "copy.\(field.id)", title: "Copy Website", shortcutHint: nil, effect: .copy(field)),
                 ]
             }
-            let shortcutHint: String? = if field.id == item.firstField(withRole: .password)?.id {
-                "⇧⌘C"
-            } else if field.id == item.firstField(withRole: .oneTimeCode)?.id {
-                "⌥⌘C"
-            } else if field.id == item.primaryField?.id {
-                "⌘C"
-            } else {
-                nil
-            }
+            let shortcutHint: String? =
+                if field.id == item.firstField(withRole: .password)?.id {
+                    "⇧⌘C"
+                } else if field.id == item.firstField(withRole: .oneTimeCode)?.id {
+                    "⌥⌘C"
+                } else if field.id == item.primaryField?.id {
+                    "⌘C"
+                } else {
+                    nil
+                }
             return [
-                ItemAction(id: "copy.\(field.id)", title: "Copy \(field.label)", shortcutHint: shortcutHint, effect: .copy(field)),
+                ItemAction(
+                    id: "copy.\(field.id)", title: "Copy \(field.label)", shortcutHint: shortcutHint,
+                    effect: .copy(field))
             ]
         }
     }

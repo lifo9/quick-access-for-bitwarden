@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "BitwardenQuickAccess",
     platforms: [
-        .macOS(.v15),
+        .macOS(.v15)
     ],
     targets: [
         .target(name: "QuickAccessCore"),

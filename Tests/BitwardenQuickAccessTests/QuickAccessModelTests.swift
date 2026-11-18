@@ -1,8 +1,9 @@
 import AppKit
-@testable import BitwardenQuickAccess
 import QuickAccessCore
 import QuickAccessTestSupport
 import XCTest
+
+@testable import BitwardenQuickAccess
 
 /// Stands in for the Bitwarden desktop app: serves a state file and answers unlock requests.
 @MainActor
@@ -103,7 +104,8 @@ final class QuickAccessModelTests: XCTestCase {
         ciphers: [[String: Any]]? = nil,
         settings: [String: Any] = [:]
     ) async throws -> Harness {
-        let harness = try ciphers.map { try makeHarness(ciphers: $0, settings: settings) }
+        let harness =
+            try ciphers.map { try makeHarness(ciphers: $0, settings: settings) }
             ?? makeHarness(settings: settings)
         harness.model.prepareForShowing(frontmostAppName: nil)
         await harness.model.unlock()
@@ -125,7 +127,7 @@ final class QuickAccessModelTests: XCTestCase {
 
         await harness.model.unlock()
 
-        guard case let .locked(explanation) = harness.session.state else {
+        guard case .locked(let explanation) = harness.session.state else {
             return XCTFail("expected the session to stay locked")
         }
         XCTAssertEqual(explanation, "Touch ID was cancelled.")
@@ -138,7 +140,7 @@ final class QuickAccessModelTests: XCTestCase {
 
         await harness.model.unlock()
 
-        guard case let .locked(explanation) = harness.session.state else {
+        guard case .locked(let explanation) = harness.session.state else {
             return XCTFail("expected the session to stay locked")
         }
         XCTAssertEqual(explanation?.contains("master password"), true)
@@ -150,7 +152,7 @@ final class QuickAccessModelTests: XCTestCase {
 
         harness.model.activateSelection()
         // The unlock runs in a task of its own; give it time to finish.
-        for _ in 0 ..< 200 where !harness.session.isUnlocked {
+        for _ in 0..<200 where !harness.session.isUnlocked {
             try await Task.sleep(for: .milliseconds(10))
         }
 
@@ -190,7 +192,8 @@ final class QuickAccessModelTests: XCTestCase {
 
         // The period may roll over between the two calls, so either code is right.
         let codeAfter = TotpGenerator.generateCode(configuration: configuration, at: Date())
-        XCTAssertTrue([codeBefore, codeAfter].contains(harness.copiedText), "copied \(harness.copiedText ?? "nothing")")
+        XCTAssertTrue(
+            [codeBefore, codeAfter].contains(harness.copiedText), "copied \(harness.copiedText ?? "nothing")")
         XCTAssertEqual(harness.copiedText?.count, 6)
     }
 
@@ -208,7 +211,7 @@ final class QuickAccessModelTests: XCTestCase {
 
     func test_activateSelection__refusesSecretOfItemWithMasterPasswordReprompt() async throws {
         let harness = try await makeUnlockedHarness(ciphers: [
-            StateFileBuilder.makeLogin(name: "Protected", extra: ["reprompt": 1]),
+            StateFileBuilder.makeLogin(name: "Protected", extra: ["reprompt": 1])
         ])
 
         harness.model.activateSelection()
@@ -223,9 +226,11 @@ final class QuickAccessModelTests: XCTestCase {
     }
 
     func test_copyOneTimeCode__explainsWhenItemHasNone() async throws {
-        let loginWithoutCode = StateFileBuilder.makeLogin(name: "Plain", extra: [
-            "login": ["username": Fixtures.encrypt("alice", with: Fixtures.userKey)],
-        ])
+        let loginWithoutCode = StateFileBuilder.makeLogin(
+            name: "Plain",
+            extra: [
+                "login": ["username": Fixtures.encrypt("alice", with: Fixtures.userKey)]
+            ])
         let harness = try await makeUnlockedHarness(ciphers: [loginWithoutCode])
 
         harness.model.copyOneTimeCode()
@@ -269,7 +274,7 @@ final class QuickAccessModelTests: XCTestCase {
 
     func test_updateQuery__keepsTheNoticeWhenTheTextDidNotChange() async throws {
         let harness = try await makeUnlockedHarness(ciphers: [
-            StateFileBuilder.makeLogin(name: "Protected", extra: ["reprompt": 1]),
+            StateFileBuilder.makeLogin(name: "Protected", extra: ["reprompt": 1])
         ])
         harness.model.activateSelection()
 
@@ -323,9 +328,11 @@ final class QuickAccessModelTests: XCTestCase {
     }
 
     func test_openWebsite__refusesAddressesThatAreNotWebPages() async throws {
-        let loginWithAppAddress = StateFileBuilder.makeLogin(name: "App", extra: [
-            "login": ["uris": [["uri": Fixtures.encrypt("ssh://example.com", with: Fixtures.userKey)]]],
-        ])
+        let loginWithAppAddress = StateFileBuilder.makeLogin(
+            name: "App",
+            extra: [
+                "login": ["uris": [["uri": Fixtures.encrypt("ssh://example.com", with: Fixtures.userKey)]]]
+            ])
         let harness = try await makeUnlockedHarness(ciphers: [loginWithAppAddress])
 
         harness.model.openWebsite()
@@ -356,7 +363,7 @@ final class QuickAccessModelTests: XCTestCase {
 
     func test_handle__locksOnTheEventTheDesktopAppsVaultTimeoutNames() async throws {
         let harness = try await makeUnlockedHarness(settings: [
-            StateFileBuilder.settingKey("vaultTimeoutSettings_vaultTimeout"): "onSleep",
+            StateFileBuilder.settingKey("vaultTimeoutSettings_vaultTimeout"): "onSleep"
         ])
 
         harness.session.handle(.screenLocked)
@@ -385,7 +392,7 @@ final class QuickAccessModelTests: XCTestCase {
         let harness = try await makeUnlockedHarness()
 
         harness.desktop.stateFile = try StateFileBuilder.makeStateFile(ciphers: [
-            StateFileBuilder.makeLogin(id: "new", name: "New login"),
+            StateFileBuilder.makeLogin(id: "new", name: "New login")
         ])
         harness.desktop.stateModificationDate = Date(timeIntervalSince1970: 2_000)
         harness.model.prepareForShowing(frontmostAppName: nil)
@@ -410,7 +417,7 @@ final class QuickAccessModelTests: XCTestCase {
 
     func test_unlock__adoptsTheDesktopAppsClipboardClearDelay() async throws {
         let harness = try await makeUnlockedHarness(settings: [
-            StateFileBuilder.settingKey("autofillSettingsLocal_clearClipboardDelay"): "tenSeconds",
+            StateFileBuilder.settingKey("autofillSettingsLocal_clearClipboardDelay"): "tenSeconds"
         ])
 
         XCTAssertEqual(harness.session.settings.clipboardClearDelay, .seconds(10))

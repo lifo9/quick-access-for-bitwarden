@@ -51,7 +51,8 @@ final class VaultSession {
                 self?.handle(.screenLocked)
             }
         }
-        periodicCheck = Timer.scheduledTimer(withTimeInterval: Self.periodicCheckInterval, repeats: true) { [weak self] _ in
+        periodicCheck = Timer.scheduledTimer(withTimeInterval: Self.periodicCheckInterval, repeats: true) {
+            [weak self] _ in
             MainActor.assumeIsolated {
                 self?.runPeriodicCheck()
             }
@@ -76,7 +77,7 @@ final class VaultSession {
             let stateFileModificationDate = try desktop.readStateModificationDate()
             let outcome = try await desktop.requestUnlock(userId: desktopState.userId)
             switch outcome {
-            case let .unlocked(userKey):
+            case .unlocked(let userKey):
                 let vault = try VaultDecryptor.unlock(desktopState, userKey: userKey)
                 self.userKey = userKey
                 self.unlockedUserId = desktopState.userId
@@ -86,7 +87,7 @@ final class VaultSession {
                 state = .unlocked(vault)
             case .denied:
                 state = .locked(explanation: "Touch ID was cancelled.")
-            case let .unavailable(status):
+            case .unavailable(let status):
                 state = .locked(explanation: Self.explain(status))
             }
         } catch {
@@ -128,11 +129,13 @@ final class VaultSession {
     private func runPeriodicCheck() {
         // Any kind of input counts as activity, as it does for the desktop app's idle check.
         let anyInputEventType = CGEventType(rawValue: UInt32.max)!
-        let systemIdleSeconds = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInputEventType)
-        handle(.periodicCheck(
-            systemIdleSeconds: systemIdleSeconds,
-            secondsSinceLastUse: Date().timeIntervalSince(lastUseDate)
-        ))
+        let systemIdleSeconds = CGEventSource.secondsSinceLastEventType(
+            .combinedSessionState, eventType: anyInputEventType)
+        handle(
+            .periodicCheck(
+                systemIdleSeconds: systemIdleSeconds,
+                secondsSinceLastUse: Date().timeIntervalSince(lastUseDate)
+            ))
     }
 
     /// Locks the vault if the desktop app's vault timeout setting asks for it on this event.
@@ -152,7 +155,7 @@ final class VaultSession {
         case .hardwareUnavailable:
             "Touch ID is not available right now."
         case .available, .autoSetupNeeded, .manualSetupNeeded, .platformUnsupported, .desktopDisconnected,
-             .nativeMessagingPermissionMissing:
+            .nativeMessagingPermissionMissing:
             "Bitwarden cannot unlock with Touch ID right now (\(status))."
         }
     }

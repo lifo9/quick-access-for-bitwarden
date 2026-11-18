@@ -46,12 +46,12 @@ public enum EncryptedString: Sendable, Equatable {
 
     public var serialized: String {
         switch self {
-        case let .aesCbc256HmacSha256(initializationVector, ciphertext, authenticationCode):
+        case .aesCbc256HmacSha256(let initializationVector, let ciphertext, let authenticationCode):
             let parts = [initializationVector, ciphertext, authenticationCode]
             return "2." + parts.map { $0.base64EncodedString() }.joined(separator: "|")
-        case let .rsa2048OaepSha256(ciphertext):
+        case .rsa2048OaepSha256(let ciphertext):
             return "3." + ciphertext.base64EncodedString()
-        case let .rsa2048OaepSha1(ciphertext):
+        case .rsa2048OaepSha1(let ciphertext):
             return "4." + ciphertext.base64EncodedString()
         }
     }

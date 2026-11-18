@@ -21,13 +21,13 @@ public enum StateFileBuilder {
         let accountState: [String: Any] = [
             "global_account_activeAccountId": userId,
             "user_\(userId)_crypto_accountCryptographicState": [
-                "V1": ["private_key": Fixtures.encrypt(Fixtures.pkcs8PrivateKey, with: Fixtures.userKey)],
+                "V1": ["private_key": Fixtures.encrypt(Fixtures.pkcs8PrivateKey, with: Fixtures.userKey)]
             ],
             "user_\(userId)_crypto_organizationKeys": [
                 organizationId: [
                     "type": "organization",
                     "key": "4." + Fixtures.wrappedOrganizationKey.base64EncodedString(),
-                ],
+                ]
             ],
             "user_\(userId)_ciphers_ciphers": ciphersById,
         ]

@@ -25,15 +25,15 @@ public enum LockPolicy {
             true
         case (.onScreenLocked, _), (.onSleep, _):
             false
-        case let (.onSystemIdle, .periodicCheck(systemIdleSeconds, _)):
+        case (.onSystemIdle, .periodicCheck(let systemIdleSeconds, _)):
             systemIdleSeconds >= systemIdleThresholdSeconds
         case (.onSystemIdle, _):
             false
-        case let (.afterMinutes(minutes), .periodicCheck(_, secondsSinceLastUse)):
+        case (.afterMinutes(let minutes), .periodicCheck(_, let secondsSinceLastUse)):
             secondsSinceLastUse >= TimeInterval(minutes * 60)
         case (.afterMinutes, _):
             false
-        case let (.unrecognized, .periodicCheck(systemIdleSeconds, _)):
+        case (.unrecognized, .periodicCheck(let systemIdleSeconds, _)):
             // A setting this app cannot interpret gets the strictest reading of every event.
             systemIdleSeconds >= systemIdleThresholdSeconds
         case (.unrecognized, .screenLocked), (.unrecognized, .systemWillSleep):

@@ -7,8 +7,9 @@ the two desktop app internals it depends on.
 
 ## Checks
 
-`just check` (`swift build --build-tests`, then `swift test`). There is no CI yet; run it before
-every commit. `just bundle` builds the `.app`.
+`just check`: `swift format lint --strict` over `Sources`, `Tests` and `Package.swift`, then
+`swift build --build-tests`, then `swift test`. There is no CI yet; run it before every commit.
+`just format` applies the format, `just bundle` builds the `.app`.
 
 ## Layout
 

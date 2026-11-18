@@ -48,7 +48,7 @@ public struct TotpConfiguration: Sendable, Equatable {
             default: algorithm = .sha1
             }
             // Out-of-range values fall back to the defaults, as authenticator apps do.
-            numDigits = valuesByParameter["digits"].flatMap(Int.init).flatMap { (1 ... 10).contains($0) ? $0 : nil } ?? 6
+            numDigits = valuesByParameter["digits"].flatMap(Int.init).flatMap { (1...10).contains($0) ? $0 : nil } ?? 6
             periodSeconds = valuesByParameter["period"].flatMap(Int.init).flatMap { $0 > 0 ? $0 : nil } ?? 30
             usesSteamAlphabet = false
         } else {
@@ -69,16 +69,18 @@ public enum TotpGenerator {
         let timeStep = UInt64(max(0, date.timeIntervalSince1970)) / UInt64(configuration.periodSeconds)
         let counterBytes = withUnsafeBytes(of: timeStep.bigEndian) { Data($0) }
         let secretKey = SymmetricKey(data: configuration.secret)
-        let digest: [UInt8] = switch configuration.algorithm {
-        case .sha1: Array(HMAC<Insecure.SHA1>.authenticationCode(for: counterBytes, using: secretKey))
-        case .sha256: Array(HMAC<SHA256>.authenticationCode(for: counterBytes, using: secretKey))
-        case .sha512: Array(HMAC<SHA512>.authenticationCode(for: counterBytes, using: secretKey))
-        }
+        let digest: [UInt8] =
+            switch configuration.algorithm {
+            case .sha1: Array(HMAC<Insecure.SHA1>.authenticationCode(for: counterBytes, using: secretKey))
+            case .sha256: Array(HMAC<SHA256>.authenticationCode(for: counterBytes, using: secretKey))
+            case .sha512: Array(HMAC<SHA512>.authenticationCode(for: counterBytes, using: secretKey))
+            }
 
         // Dynamic truncation (RFC 4226): the low nibble of the last byte picks four bytes, whose
         // top bit is dropped to get a positive 31 bit number.
         let truncationOffset = Int(digest[digest.count - 1] & 0x0F)
-        let truncatedNumber = digest[truncationOffset ..< truncationOffset + 4]
+        let truncatedNumber =
+            digest[truncationOffset..<truncationOffset + 4]
             .reduce(UInt32(0)) { ($0 << 8) | UInt32($1) } & 0x7FFF_FFFF
 
         if configuration.usesSteamAlphabet {
@@ -87,7 +89,7 @@ public enum TotpGenerator {
                 .map { $0 % steamAlphabet.count }
             return String(characterIndices.map { steamAlphabet[$0] })
         }
-        let modulus = (0 ..< configuration.numDigits).reduce(UInt64(1)) { power, _ in power * 10 }
+        let modulus = (0..<configuration.numDigits).reduce(UInt64(1)) { power, _ in power * 10 }
         let code = String(UInt64(truncatedNumber) % modulus)
         return String(repeating: "0", count: configuration.numDigits - code.count) + code
     }

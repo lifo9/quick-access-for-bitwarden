@@ -38,7 +38,9 @@ public final class DesktopProxyTransport: DesktopTransport, @unchecked Sendable 
                 continuation.finish()
                 return
             }
-            payloads.forEach { continuation.yield($0) }
+            for payload in payloads {
+                continuation.yield(payload)
+            }
         }
 
         process.executableURL = proxyExecutable
@@ -68,7 +70,8 @@ public final class DesktopProxyTransport: DesktopTransport, @unchecked Sendable 
 
         func append(_ receivedBytes: Data) throws -> [Data] {
             try lock.withLock {
-                let (payloads, remainder) = try NativeMessagingFrame.splitPayloads(from: unfinishedBytes + receivedBytes)
+                let (payloads, remainder) = try NativeMessagingFrame.splitPayloads(
+                    from: unfinishedBytes + receivedBytes)
                 unfinishedBytes = remainder
                 return payloads
             }

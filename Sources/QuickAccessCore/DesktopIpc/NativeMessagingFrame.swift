@@ -25,7 +25,7 @@ public enum NativeMessagingFrame {
         var offset = 0
         while bytes.count - offset >= lengthPrefixByteCount {
             let payloadByteCount = Int(
-                bytes[offset ..< offset + lengthPrefixByteCount].withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+                bytes[offset..<offset + lengthPrefixByteCount].withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
             )
             guard payloadByteCount <= maxPayloadByteCount else {
                 throw FrameError.payloadTooLarge(payloadByteCount)
@@ -34,7 +34,7 @@ public enum NativeMessagingFrame {
             guard bytes.count - payloadStart >= payloadByteCount else {
                 break
             }
-            payloads.append(Data(bytes[payloadStart ..< payloadStart + payloadByteCount]))
+            payloads.append(Data(bytes[payloadStart..<payloadStart + payloadByteCount]))
             offset = payloadStart + payloadByteCount
         }
         return (payloads, Data(bytes[offset...]))

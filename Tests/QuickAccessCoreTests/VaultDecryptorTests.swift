@@ -1,7 +1,8 @@
 import Foundation
-@testable import QuickAccessCore
 import QuickAccessTestSupport
 import XCTest
+
+@testable import QuickAccessCore
 
 final class VaultDecryptorTests: XCTestCase {
     private let userId = StateFileBuilder.userId
@@ -83,7 +84,9 @@ final class VaultDecryptorTests: XCTestCase {
         XCTAssertEqual(item.kind, .card)
         XCTAssertEqual(item.subtitle, "Visa")
         XCTAssertEqual(try item.revealValue(of: XCTUnwrap(item.defaultField)), "4111111111111111")
-        XCTAssertEqual(item.fields.map(\.label), ["Number", "Security code", "Cardholder name", "Expiration month", "Expiration year", "Brand"])
+        XCTAssertEqual(
+            item.fields.map(\.label),
+            ["Number", "Security code", "Cardholder name", "Expiration month", "Expiration year", "Brand"])
     }
 
     func test_unlock__decryptsSecureNoteAndCustomFields() throws {
@@ -94,9 +97,18 @@ final class VaultDecryptorTests: XCTestCase {
             "notes": Fixtures.encrypt("guest network", with: Fixtures.userKey),
             "secureNote": ["type": 0],
             "fields": [
-                ["name": Fixtures.encrypt("SSID", with: Fixtures.userKey), "value": Fixtures.encrypt("home", with: Fixtures.userKey), "type": 0, "linkedId": NSNull()],
-                ["name": Fixtures.encrypt("Key", with: Fixtures.userKey), "value": Fixtures.encrypt("hunter2", with: Fixtures.userKey), "type": 1, "linkedId": NSNull()],
-                ["name": Fixtures.encrypt("Linked", with: Fixtures.userKey), "value": NSNull(), "type": 3, "linkedId": 100],
+                [
+                    "name": Fixtures.encrypt("SSID", with: Fixtures.userKey),
+                    "value": Fixtures.encrypt("home", with: Fixtures.userKey), "type": 0, "linkedId": NSNull(),
+                ],
+                [
+                    "name": Fixtures.encrypt("Key", with: Fixtures.userKey),
+                    "value": Fixtures.encrypt("hunter2", with: Fixtures.userKey), "type": 1, "linkedId": NSNull(),
+                ],
+                [
+                    "name": Fixtures.encrypt("Linked", with: Fixtures.userKey), "value": NSNull(), "type": 3,
+                    "linkedId": 100,
+                ],
             ],
         ]
 
@@ -182,25 +194,33 @@ final class VaultDecryptorTests: XCTestCase {
     // MARK: - Reading the state file
 
     func test_DesktopState_init__readsTheSettingsOfTheActiveAccount() throws {
-        let state = try DesktopState(stateFileContents: makeStateFile(ciphers: [], settings: [
-            "user_\(userId)_vaultTimeoutSettings_vaultTimeout": "onIdle",
-            "user_\(userId)_autofillSettingsLocal_clearClipboardDelay": "thirtySeconds",
-            "user_\(userId)_biometricSettings_biometricUnlockEnabled": true,
-            "user_other-account_vaultTimeoutSettings_vaultTimeout": "never",
-        ]))
+        let state = try DesktopState(
+            stateFileContents: makeStateFile(
+                ciphers: [],
+                settings: [
+                    "user_\(userId)_vaultTimeoutSettings_vaultTimeout": "onIdle",
+                    "user_\(userId)_autofillSettingsLocal_clearClipboardDelay": "thirtySeconds",
+                    "user_\(userId)_biometricSettings_biometricUnlockEnabled": true,
+                    "user_other-account_vaultTimeoutSettings_vaultTimeout": "never",
+                ]))
 
         XCTAssertEqual(state.userId, userId)
-        XCTAssertEqual(state.settings, DesktopSettings(
-            vaultTimeout: .onSystemIdle,
-            clipboardClearDelay: .seconds(30),
-            isBiometricUnlockEnabled: true
-        ))
+        XCTAssertEqual(
+            state.settings,
+            DesktopSettings(
+                vaultTimeout: .onSystemIdle,
+                clipboardClearDelay: .seconds(30),
+                isBiometricUnlockEnabled: true
+            ))
     }
 
     func test_DesktopState_init__readsVaultTimeoutGivenInMinutes() throws {
-        let state = try DesktopState(stateFileContents: makeStateFile(ciphers: [], settings: [
-            "user_\(userId)_vaultTimeoutSettings_vaultTimeout": 15,
-        ]))
+        let state = try DesktopState(
+            stateFileContents: makeStateFile(
+                ciphers: [],
+                settings: [
+                    "user_\(userId)_vaultTimeoutSettings_vaultTimeout": 15
+                ]))
 
         XCTAssertEqual(state.settings.vaultTimeout, .afterMinutes(15))
     }
@@ -208,18 +228,23 @@ final class VaultDecryptorTests: XCTestCase {
     func test_DesktopState_init__appliesDesktopDefaultsWhenSettingsWereNeverChanged() throws {
         let state = try DesktopState(stateFileContents: makeStateFile(ciphers: []))
 
-        XCTAssertEqual(state.settings, DesktopSettings(
-            vaultTimeout: .onRestart,
-            clipboardClearDelay: .seconds(300),
-            isBiometricUnlockEnabled: false
-        ))
+        XCTAssertEqual(
+            state.settings,
+            DesktopSettings(
+                vaultTimeout: .onRestart,
+                clipboardClearDelay: .seconds(300),
+                isBiometricUnlockEnabled: false
+            ))
     }
 
     func test_DesktopState_init__treatsUnknownSettingValuesStrictly() throws {
-        let state = try DesktopState(stateFileContents: makeStateFile(ciphers: [], settings: [
-            "user_\(userId)_vaultTimeoutSettings_vaultTimeout": "onFullMoon",
-            "user_\(userId)_autofillSettingsLocal_clearClipboardDelay": "eventually",
-        ]))
+        let state = try DesktopState(
+            stateFileContents: makeStateFile(
+                ciphers: [],
+                settings: [
+                    "user_\(userId)_vaultTimeoutSettings_vaultTimeout": "onFullMoon",
+                    "user_\(userId)_autofillSettingsLocal_clearClipboardDelay": "eventually",
+                ]))
 
         XCTAssertEqual(state.settings.vaultTimeout, .unrecognized)
         XCTAssertEqual(state.settings.clipboardClearDelay, .seconds(30))

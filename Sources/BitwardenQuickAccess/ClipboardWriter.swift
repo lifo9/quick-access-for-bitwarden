@@ -25,7 +25,7 @@ final class ClipboardWriter {
         changeCountOfOwnCopy = pasteboard.changeCount
 
         pendingClear?.cancel()
-        guard case let .seconds(delaySeconds) = clearDelay else {
+        guard case .seconds(let delaySeconds) = clearDelay else {
             pendingClear = nil
             return
         }

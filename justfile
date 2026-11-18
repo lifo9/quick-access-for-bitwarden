@@ -1,10 +1,15 @@
 default:
     @just --list
 
-# The gate before a commit: build everything, run all tests.
+# The gate before a commit: format and lint check, build everything, run all tests.
 check:
+    swift format lint --strict --recursive Sources Tests Package.swift
     swift build --build-tests
     swift test
+
+# Rewrite the sources in the format the check expects.
+format:
+    swift format --in-place --recursive Sources Tests Package.swift
 
 # Assemble and sign "build/Bitwarden Quick Access.app" from a release build.
 bundle:

@@ -51,7 +51,7 @@ enum DerEncoding {
             guard contentLength <= bytes.count - offset else {
                 throw CryptoError.malformedPrivateKey
             }
-            let content = Data(bytes[offset ..< offset + contentLength])
+            let content = Data(bytes[offset..<offset + contentLength])
             offset += contentLength
             return content
         }
@@ -70,7 +70,7 @@ enum DerEncoding {
             guard numLengthBytes >= 1, numLengthBytes <= 4, numLengthBytes <= bytes.count - offset else {
                 throw CryptoError.malformedPrivateKey
             }
-            let length = bytes[offset ..< offset + numLengthBytes].reduce(0) { ($0 << 8) | Int($1) }
+            let length = bytes[offset..<offset + numLengthBytes].reduce(0) { ($0 << 8) | Int($1) }
             offset += numLengthBytes
             return length
         }

@@ -36,7 +36,7 @@ struct QuickAccessView: View {
             // back selects the whole query, so that the next key press would replace it.
             searchField
                 .opacity(model.mode == .items ? 1 : 0)
-            if case let .actions(item) = model.mode {
+            if case .actions(let item) = model.mode {
                 itemHeader(item)
             }
         }
@@ -82,7 +82,7 @@ struct QuickAccessView: View {
     @ViewBuilder
     private var content: some View {
         switch model.session.state {
-        case let .locked(explanation):
+        case .locked(let explanation):
             StatusMessage(
                 symbolName: "lock.fill",
                 title: "Bitwarden is locked",
@@ -94,7 +94,7 @@ struct QuickAccessView: View {
                 title: "Unlocking…",
                 detail: "Confirm the Touch ID prompt from Bitwarden."
             )
-        case let .unlocked(vault):
+        case .unlocked(let vault):
             switch model.mode {
             case .items:
                 itemList(numUndecryptableItems: vault.numUndecryptableItems)
@@ -119,30 +119,31 @@ struct QuickAccessView: View {
                 rowIds: model.matchingItems.map(\.id),
                 selectedRowIndex: model.selectedItemIndex,
                 rowHeight: Self.rowHeight,
-                onActivate: { model.activateItem(at: $0) }
-            ) { itemIndex, isSelected in
-                let item = model.matchingItems[itemIndex]
-                HStack(spacing: 12) {
-                    ItemIcon(kind: item.kind)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(item.name)
-                            .font(.system(size: 14, weight: .medium))
-                            .lineLimit(1)
-                        if !item.subtitle.isEmpty {
-                            Text(item.subtitle)
-                                .font(.system(size: 12))
-                                .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                onActivate: { model.activateItem(at: $0) },
+                rowContent: { itemIndex, isSelected in
+                    let item = model.matchingItems[itemIndex]
+                    HStack(spacing: 12) {
+                        ItemIcon(kind: item.kind)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.name)
+                                .font(.system(size: 14, weight: .medium))
                                 .lineLimit(1)
+                            if !item.subtitle.isEmpty {
+                                Text(item.subtitle)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer()
+                        if item.isFavorite {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
                         }
                     }
-                    Spacer()
-                    if item.isFavorite {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
-                    }
                 }
-            }
+            )
         }
     }
 
@@ -152,21 +153,22 @@ struct QuickAccessView: View {
             rowIds: actions.map(\.id),
             selectedRowIndex: model.selectedActionIndex,
             rowHeight: 34,
-            onActivate: { model.activateAction(at: $0) }
-        ) { actionIndex, isSelected in
-            let action = actions[actionIndex]
-            HStack {
-                Text(action.title)
-                    .font(.system(size: 14))
-                    .lineLimit(1)
-                Spacer()
-                if let shortcutHint = action.shortcutHint {
-                    Text(shortcutHint)
-                        .font(.system(size: 12))
-                        .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+            onActivate: { model.activateAction(at: $0) },
+            rowContent: { actionIndex, isSelected in
+                let action = actions[actionIndex]
+                HStack {
+                    Text(action.title)
+                        .font(.system(size: 14))
+                        .lineLimit(1)
+                    Spacer()
+                    if let shortcutHint = action.shortcutHint {
+                        Text(shortcutHint)
+                            .font(.system(size: 12))
+                            .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                    }
                 }
             }
-        }
+        )
     }
 
     // MARK: - Footer

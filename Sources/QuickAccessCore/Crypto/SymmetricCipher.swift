@@ -8,7 +8,8 @@ public enum SymmetricCipher {
     public static let initializationVectorByteCount = kCCBlockSizeAES128
 
     public static func decrypt(_ encrypted: EncryptedString, with key: SymmetricCryptoKey) throws -> Data {
-        guard case let .aesCbc256HmacSha256(initializationVector, ciphertext, authenticationCode) = encrypted else {
+        guard case .aesCbc256HmacSha256(let initializationVector, let ciphertext, let authenticationCode) = encrypted
+        else {
             throw CryptoError.unsupportedEncryptionType("asymmetric value given to the symmetric cipher")
         }
         // The MAC is checked before any decryption so that tampered input never reaches the cipher.

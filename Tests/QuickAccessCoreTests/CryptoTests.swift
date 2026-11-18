@@ -1,7 +1,8 @@
 import Foundation
-@testable import QuickAccessCore
 import QuickAccessTestSupport
 import XCTest
+
+@testable import QuickAccessCore
 
 final class CryptoTests: XCTestCase {
     private var openSslEncryptedString: EncryptedString {

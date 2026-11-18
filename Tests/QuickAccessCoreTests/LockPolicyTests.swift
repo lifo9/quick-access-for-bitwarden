@@ -1,6 +1,7 @@
 import Foundation
-@testable import QuickAccessCore
 import XCTest
+
+@testable import QuickAccessCore
 
 final class LockPolicyTests: XCTestCase {
     private func check(systemIdleSeconds: TimeInterval = 0, secondsSinceLastUse: TimeInterval = 0) -> LockEvent {
@@ -17,7 +18,8 @@ final class LockPolicyTests: XCTestCase {
     func test_shouldLock__afterMinutesCountsFromLastUseOfThisApp() {
         let timeout = VaultTimeout.afterMinutes(15)
 
-        XCTAssertFalse(LockPolicy.shouldLock(vaultTimeout: timeout, on: check(systemIdleSeconds: 3600, secondsSinceLastUse: 899)))
+        XCTAssertFalse(
+            LockPolicy.shouldLock(vaultTimeout: timeout, on: check(systemIdleSeconds: 3600, secondsSinceLastUse: 899)))
         XCTAssertTrue(LockPolicy.shouldLock(vaultTimeout: timeout, on: check(secondsSinceLastUse: 900)))
         XCTAssertTrue(LockPolicy.shouldLock(vaultTimeout: .afterMinutes(0), on: check()))
     }
@@ -31,7 +33,9 @@ final class LockPolicyTests: XCTestCase {
 
     func test_shouldLock__neverAndOnRestartKeepTheVaultUnlockedWhileRunning() {
         for timeout in [VaultTimeout.never, .onRestart] {
-            for event in [LockEvent.systemWillSleep, .screenLocked, check(systemIdleSeconds: 86400, secondsSinceLastUse: 86400)] {
+            for event in [
+                LockEvent.systemWillSleep, .screenLocked, check(systemIdleSeconds: 86400, secondsSinceLastUse: 86400),
+            ] {
                 XCTAssertFalse(LockPolicy.shouldLock(vaultTimeout: timeout, on: event))
             }
         }

@@ -88,7 +88,7 @@ public struct DesktopBiometricsClient: Sendable {
 
     private func requestStatus(in conversation: inout Conversation) async throws -> BiometricsStatus {
         let reply = try await conversation.request(command: "getBiometricsStatusForUser")
-        guard case let .number(rawStatus) = reply.response, let status = BiometricsStatus(rawValue: rawStatus) else {
+        guard case .number(let rawStatus) = reply.response, let status = BiometricsStatus(rawValue: rawStatus) else {
             throw DesktopIpcError.malformedReply
         }
         return status
@@ -134,7 +134,8 @@ public struct DesktopBiometricsClient: Sendable {
         try transport.send(payload: JSONEncoder().encode(handshake))
 
         let appId = appId
-        let sessionSecret = try await Self.waitForEnvelope(from: &payloadIterator) { envelope, payload -> SymmetricCryptoKey? in
+        let sessionSecret = try await Self.waitForEnvelope(from: &payloadIterator) {
+            envelope, payload -> SymmetricCryptoKey? in
             // The desktop app broadcasts to all its clients; messages for others are not ours.
             guard envelope.appId == appId else {
                 return nil
@@ -215,7 +216,8 @@ public struct DesktopBiometricsClient: Sendable {
             let appId = appId
             let sessionSecret = sessionSecret
             let currentDate = currentDate
-            return try await DesktopBiometricsClient.waitForEnvelope(from: &payloadIterator) { envelope, payload -> CommandReply? in
+            return try await DesktopBiometricsClient.waitForEnvelope(from: &payloadIterator) {
+                envelope, payload -> CommandReply? in
                 guard envelope.appId == appId else {
                     return nil
                 }
@@ -228,7 +230,8 @@ public struct DesktopBiometricsClient: Sendable {
                 let replyJson = try SymmetricCipher.decrypt(encryptedReply.message.encryptedString, with: sessionSecret)
                 let reply = try JSONDecoder().decode(CommandReply.self, from: replyJson)
                 let replyAgeSeconds = abs(currentDate().timeIntervalSince1970 - TimeInterval(reply.timestamp) / 1000)
-                let isFreshAnswerToThisRequest = reply.messageId == messageId
+                let isFreshAnswerToThisRequest =
+                    reply.messageId == messageId
                     && replyAgeSeconds <= DesktopBiometricsClient.maxMessageAgeSeconds
                 return isFreshAnswerToThisRequest ? reply : nil
             }
@@ -321,7 +324,10 @@ private struct EncryptedPayload: Codable {
     }
 
     func encode(to encoder: Encoder) throws {
-        guard case let .aesCbc256HmacSha256(initializationVector, ciphertext, authenticationCode) = encryptedString else {
+        guard
+            case .aesCbc256HmacSha256(let initializationVector, let ciphertext, let authenticationCode) =
+                encryptedString
+        else {
             throw CryptoError.unsupportedEncryptionType("only symmetric values are sent over IPC")
         }
         var container = encoder.container(keyedBy: CodingKeys.self)

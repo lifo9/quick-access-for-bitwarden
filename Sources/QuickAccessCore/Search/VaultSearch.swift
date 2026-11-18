@@ -17,7 +17,8 @@ public enum VaultSearch {
         let scoredItems: [(item: VaultItem, score: Int)] = items.compactMap { item in
             let searchableItem = SearchableItem(item)
             if queryWords.isEmpty {
-                let isNamedAfterFrontmostApp = !normalizedAppName.isEmpty
+                let isNamedAfterFrontmostApp =
+                    !normalizedAppName.isEmpty
                     && searchableItem.name.contains(normalizedAppName)
                 return (item, isNamedAfterFrontmostApp ? 1 : 0)
             }
@@ -28,17 +29,16 @@ public enum VaultSearch {
             return (item, wordScores.reduce(0, +))
         }
 
-        return scoredItems
-            .sorted { first, second in
-                let firstSortKey = (first.score, numUsesByItemId[first.item.id] ?? 0, first.item.isFavorite ? 1 : 0)
-                let secondSortKey = (second.score, numUsesByItemId[second.item.id] ?? 0, second.item.isFavorite ? 1 : 0)
-                if firstSortKey != secondSortKey {
-                    return firstSortKey > secondSortKey
-                }
-                // The id breaks ties between items of the same name, to keep the order stable.
-                return (normalize(first.item.name), first.item.id) < (normalize(second.item.name), second.item.id)
+        let rankedItems = scoredItems.sorted { first, second in
+            let firstSortKey = (first.score, numUsesByItemId[first.item.id] ?? 0, first.item.isFavorite ? 1 : 0)
+            let secondSortKey = (second.score, numUsesByItemId[second.item.id] ?? 0, second.item.isFavorite ? 1 : 0)
+            if firstSortKey != secondSortKey {
+                return firstSortKey > secondSortKey
             }
-            .map(\.item)
+            // The id breaks ties between items of the same name, to keep the order stable.
+            return (normalize(first.item.name), first.item.id) < (normalize(second.item.name), second.item.id)
+        }
+        return rankedItems.map(\.item)
     }
 
     static func normalize(_ text: String) -> String {

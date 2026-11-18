@@ -1,7 +1,8 @@
 import Foundation
-@testable import QuickAccessCore
 import QuickAccessTestSupport
 import XCTest
+
+@testable import QuickAccessCore
 
 /// Plays the Bitwarden desktop app's side of the browser integration protocol, with this
 /// package's own primitives, so the client is tested through its real wire format.
@@ -90,15 +91,18 @@ private final class FakeDesktopApp: DesktopTransport, @unchecked Sendable {
         }
 
         let replyTimestamp = Int64((Date().timeIntervalSince1970 - behavior.replyAgeSeconds) * 1000)
-        let commandResult: [String: Any] = switch command {
-        case "getBiometricsStatusForUser":
-            ["response": behavior.biometricsStatus.rawValue]
-        case "unlockWithBiometricsForUser":
-            behavior.userKeyToHandOver.map { ["response": true, "userKeyB64": $0.encodedKey.base64EncodedString()] }
-                ?? ["response": false]
-        default:
-            fatalError("the fake desktop app does not know the command \(command)")
-        }
+        let commandResult: [String: Any] =
+            switch command {
+            case "getBiometricsStatusForUser":
+                ["response": behavior.biometricsStatus.rawValue]
+            case "unlockWithBiometricsForUser":
+                behavior.userKeyToHandOver.map {
+                    ["response": true, "userKeyB64": $0.encodedKey.base64EncodedString()]
+                }
+                    ?? ["response": false]
+            default:
+                fatalError("the fake desktop app does not know the command \(command)")
+            }
         let reply = commandResult.merging([
             "command": command,
             "messageId": request["messageId"] as! Int,
@@ -106,7 +110,8 @@ private final class FakeDesktopApp: DesktopTransport, @unchecked Sendable {
         ]) { _, envelopeValue in envelopeValue }
 
         let serializedReply = Fixtures.encrypt(try JSONSerialization.data(withJSONObject: reply), with: sessionSecret)
-        let encryptedReply: Any = behavior.sendsRepliesAsBareSerializedString
+        let encryptedReply: Any =
+            behavior.sendsRepliesAsBareSerializedString
             ? serializedReply
             : ["encryptedString": serializedReply, "encryptionType": 2]
         emit(["appId": appId, "messageId": request["messageId"] as! Int, "message": encryptedReply])

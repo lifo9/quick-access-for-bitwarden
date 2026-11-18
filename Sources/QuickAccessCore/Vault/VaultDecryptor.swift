@@ -96,8 +96,10 @@ public enum VaultDecryptor {
         }
 
         let noteField = try builder.makeField(id: "notes", label: "Notes", role: .note, cipher.notes)
-        let fields = kindFields + [noteField].compactMap { $0 } + (try makeCustomFields(cipher.fields ?? [], builder: builder))
-        let websites = try fields
+        let fields =
+            kindFields + [noteField].compactMap { $0 } + (try makeCustomFields(cipher.fields ?? [], builder: builder))
+        let websites =
+            try fields
             .filter { $0.role == .website }
             .map { try SymmetricCipher.decryptString($0.encryptedValue, with: itemKey) }
 
@@ -141,16 +143,20 @@ public enum VaultDecryptor {
         // Members without the "view password" permission must not get at the secrets of a shared
         // item; the desktop app withholds the same two values.
         let canViewPassword = cipher.viewPassword ?? true
-        let secretFields = canViewPassword
+        let secretFields =
+            canViewPassword
             ? [
-                try builder.makeField(id: "login.password", label: "Password", role: .password, isConcealed: true, login.password),
-                try builder.makeField(id: "login.totp", label: "One-time code", role: .oneTimeCode, isConcealed: true, login.totp),
+                try builder.makeField(
+                    id: "login.password", label: "Password", role: .password, isConcealed: true, login.password),
+                try builder.makeField(
+                    id: "login.totp", label: "One-time code", role: .oneTimeCode, isConcealed: true, login.totp),
             ]
             : []
         let websiteFields = try (login.uris ?? []).enumerated().map { uriIndex, loginUri in
             try builder.makeField(id: "login.uri.\(uriIndex)", label: "Website", role: .website, loginUri.uri)
         }
-        let usernameField = try builder.makeField(id: "login.username", label: "Username", role: .username, login.username)
+        let usernameField = try builder.makeField(
+            id: "login.username", label: "Username", role: .username, login.username)
         return ([usernameField] + secretFields + websiteFields).compactMap { $0 }
     }
 

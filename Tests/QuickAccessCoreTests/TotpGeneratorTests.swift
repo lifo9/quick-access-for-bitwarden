@@ -1,6 +1,7 @@
 import Foundation
-@testable import QuickAccessCore
 import XCTest
+
+@testable import QuickAccessCore
 
 final class TotpGeneratorTests: XCTestCase {
     /// The secrets of the RFC 6238 test vectors, Base32 encoded.
@@ -57,7 +58,8 @@ final class TotpGeneratorTests: XCTestCase {
 
     func test_TotpConfiguration_init__throwsForSecretThatIsNotBase32() throws {
         for malformedKey in ["", "not-base32-!!!", "otpauth://totp/Example?digits=6"] {
-            XCTAssertThrowsError(try TotpConfiguration(authenticatorKey: malformedKey), "accepted \(malformedKey)") { error in
+            XCTAssertThrowsError(try TotpConfiguration(authenticatorKey: malformedKey), "accepted \(malformedKey)") {
+                error in
                 XCTAssertEqual(error as? TotpError, .malformedSecret)
             }
         }
@@ -66,7 +68,9 @@ final class TotpGeneratorTests: XCTestCase {
     func test_secondsRemaining__countsDownToTheNextPeriod() throws {
         let configuration = try TotpConfiguration(authenticatorKey: sha1Secret)
 
-        XCTAssertEqual(TotpGenerator.secondsRemaining(configuration: configuration, at: Date(timeIntervalSince1970: 59)), 1)
-        XCTAssertEqual(TotpGenerator.secondsRemaining(configuration: configuration, at: Date(timeIntervalSince1970: 60)), 30)
+        XCTAssertEqual(
+            TotpGenerator.secondsRemaining(configuration: configuration, at: Date(timeIntervalSince1970: 59)), 1)
+        XCTAssertEqual(
+            TotpGenerator.secondsRemaining(configuration: configuration, at: Date(timeIntervalSince1970: 60)), 30)
     }
 }
