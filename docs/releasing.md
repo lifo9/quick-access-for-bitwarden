@@ -31,6 +31,18 @@ The workflow does:
 
 The build is for Apple silicon only.
 
+## The Homebrew tap
+
+The cask lives in [lifo9/homebrew-tap](https://github.com/lifo9/homebrew-tap). Once a day a
+workflow there looks at the newest release here and moves the cask to it;
+`gh workflow run update.yml --repo lifo9/homebrew-tap` does so at once. Nothing in this
+repository takes part, and the tap needs no secret.
+
+The tap passes on only a disk image whose provenance attestation says it was built by
+`.github/workflows/release.yml` from `main` on a GitHub runner, and it expects a tag of the form
+`vX.Y.Z` with exactly one disk image. Renaming the workflow file or the branch, or changing what
+a release carries, means changing `scripts/update-cask.sh` in the tap with it.
+
 ## One-time setup
 
 **The certificate.** A "Developer ID Application" certificate can only be created by the account
