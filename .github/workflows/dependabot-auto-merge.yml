@@ -1,0 +1,49 @@
+name: dependabot auto-merge
+
+# Runs after `ci` has finished, from the default branch's copy of this file, so a pull request
+# cannot change what decides about merging it.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    name: merge a green Dependabot pull request
+    # Only for a `ci` run that passed, on a pull request, started by Dependabot from a branch of
+    # this repository.
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.actor.login == 'dependabot[bot]'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: merge the pull request that ci passed on
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TESTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          pull_request=$(gh pr list --repo "$REPOSITORY" --head "$HEAD_BRANCH" --state open \
+            --json number,author,headRefOid --jq '.[0]')
+          if [ -z "$pull_request" ] || [ "$pull_request" = "null" ]; then
+            echo "no open pull request for $HEAD_BRANCH"
+            exit 0
+          fi
+          author=$(jq -r '.author.login' <<<"$pull_request")
+          head_commit=$(jq -r '.headRefOid' <<<"$pull_request")
+          number=$(jq -r '.number' <<<"$pull_request")
+          # The author is checked on the pull request itself, and the commit must be the one ci
+          # tested: a push since then has to pass ci on its own.
+          if [ "$author" != "app/dependabot" ] || [ "$head_commit" != "$TESTED_COMMIT" ]; then
+            echo "not merging #$number: author $author, head $head_commit, tested $TESTED_COMMIT"
+            exit 0
+          fi
+          gh pr merge "$number" --repo "$REPOSITORY" --rebase --match-head-commit "$TESTED_COMMIT"
