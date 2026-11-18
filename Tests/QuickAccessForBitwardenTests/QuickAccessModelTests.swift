@@ -102,7 +102,7 @@ private final class Harness {
     private let effects = EffectRecorder()
     private let defaultsSuiteName = "QuickAccessModelTests-\(UUID().uuidString)"
 
-    init(ciphers: [[String: Any]], settings: [String: Any] = [:]) throws {
+    init(ciphers: [[String: Any]], settings: [String: Any], preferredSystemLanguages: [String]) throws {
         desktop = FakeDesktop(stateFile: try StateFileBuilder.makeStateFile(ciphers: ciphers, settings: settings))
         session = VaultSession(
             desktop: desktop,
@@ -114,7 +114,8 @@ private final class Harness {
             iconStore: WebsiteIconStore(fetchIconData: iconService.fetch),
             clipboard: ClipboardWriter(pasteboard: pasteboard),
             usageStore: UsageStore(defaults: UserDefaults(suiteName: defaultsSuiteName)!),
-            openInBrowser: { [effects] in effects.openedUrls.append($0) }
+            openInBrowser: { [effects] in effects.openedUrls.append($0) },
+            preferredSystemLanguages: preferredSystemLanguages
         )
         model.dismissPanel = { [effects] in effects.numDismissals += 1 }
         model.returnKeyboardFocusToPanel = { [effects] in effects.numKeyboardFocusRequests += 1 }
@@ -155,9 +156,11 @@ final class QuickAccessModelTests: XCTestCase {
             StateFileBuilder.makeLogin(id: "github", name: "GitHub", username: "octocat"),
             StateFileBuilder.makeLogin(id: "bank", name: "Bank", username: "alice"),
         ],
-        settings: [String: Any] = [:]
+        settings: [String: Any] = [:],
+        preferredSystemLanguages: [String] = ["en"]
     ) throws -> Harness {
-        let harness = try Harness(ciphers: ciphers, settings: settings)
+        let harness = try Harness(
+            ciphers: ciphers, settings: settings, preferredSystemLanguages: preferredSystemLanguages)
         addTeardownBlock { @MainActor in
             harness.cleanUp()
         }
@@ -191,10 +194,10 @@ final class QuickAccessModelTests: XCTestCase {
 
         await harness.model.unlock()
 
-        guard case .locked(let explanation) = harness.session.state else {
+        guard case .locked(let failure) = harness.session.state else {
             return XCTFail("expected the session to stay locked")
         }
-        XCTAssertEqual(explanation, "Touch ID was cancelled.")
+        XCTAssertEqual(failure, .touchIdWasCancelled)
         XCTAssertEqual(harness.matchingItemNames, [])
     }
 
@@ -204,10 +207,10 @@ final class QuickAccessModelTests: XCTestCase {
 
         await harness.model.unlock()
 
-        guard case .locked(let explanation) = harness.session.state else {
+        guard case .locked(let failure) = harness.session.state else {
             return XCTFail("expected the session to stay locked")
         }
-        XCTAssertEqual(explanation?.contains("master password"), true)
+        XCTAssertEqual(failure, .masterPasswordNeededFirst)
     }
 
     func test_activateSelection__asksForUnlockWhileLocked() async throws {
@@ -281,7 +284,7 @@ final class QuickAccessModelTests: XCTestCase {
         harness.model.activateSelection()
 
         XCTAssertNil(harness.copiedText)
-        XCTAssertEqual(harness.model.notice?.contains("master password"), true)
+        XCTAssertEqual(harness.model.notice, .masterPasswordRepromptRequired)
         XCTAssertEqual(harness.numDismissals, 0)
 
         harness.model.copyPrimaryField()
@@ -373,7 +376,7 @@ final class QuickAccessModelTests: XCTestCase {
         harness.model.showActionsOfSelectedItem()
 
         XCTAssertEqual(
-            harness.model.actions.map(\.title),
+            harness.model.actions.map(harness.model.strings.title(of:)),
             ["Copy Username", "Copy Password", "Copy One-time code", "Open Website", "Copy Website"]
         )
         XCTAssertEqual(harness.model.actions.map(\.shortcutHint), ["⌘C", "⇧⌘C", "⌥⌘C", "⌥↩", nil])
@@ -421,6 +424,55 @@ final class QuickAccessModelTests: XCTestCase {
 
         harness.model.stepBack()
         XCTAssertEqual(harness.numDismissals, 1)
+    }
+
+    // MARK: - Language
+
+    func test_strings__followTheLanguageSetInTheDesktopAppEvenBeforeUnlocking() async throws {
+        let harness = try makeHarness(settings: ["global_translation_locale": "sk"])
+
+        harness.model.prepareForShowing(frontmostAppName: nil)
+        XCTAssertFalse(harness.session.isUnlocked)
+        XCTAssertEqual(harness.model.strings.lockedTitle, "Trezor je uzamknutý")
+
+        await harness.model.unlock()
+        harness.model.showActionsOfSelectedItem()
+        XCTAssertEqual(
+            harness.model.actions.map(harness.model.strings.title(of:)),
+            [
+                "Kopírovať: Používateľské meno", "Kopírovať: Heslo", "Kopírovať: Overovací kód (TOTP)",
+                "Otvoriť webstránku", "Kopírovať: Webstránka",
+            ]
+        )
+    }
+
+    func test_strings__followTheSystemLanguageWhenTheDesktopAppDoes() async throws {
+        let harness = try makeHarness(preferredSystemLanguages: ["cs-CZ", "en-US"])
+
+        harness.model.prepareForShowing(frontmostAppName: nil)
+
+        XCTAssertEqual(harness.model.strings.lockedTitle, "Trezor je uzamčen")
+    }
+
+    func test_strings__preferTheDesktopAppsLanguageToTheSystems() async throws {
+        let harness = try makeHarness(
+            settings: ["global_translation_locale": "en"], preferredSystemLanguages: ["sk-SK"])
+
+        harness.model.prepareForShowing(frontmostAppName: nil)
+
+        XCTAssertEqual(harness.model.strings.lockedTitle, "Bitwarden is locked")
+    }
+
+    func test_strings__sayWhyTheVaultStayedLockedInTheUsersLanguage() async throws {
+        let harness = try makeHarness(settings: ["global_translation_locale": "cs"])
+        harness.desktop.unlockOutcome = .denied
+
+        await harness.model.unlock()
+
+        guard case .locked(let failure?) = harness.session.state else {
+            return XCTFail("expected a reason for staying locked")
+        }
+        XCTAssertEqual(harness.model.strings.text(of: failure), "Ověření přes Touch ID bylo zrušeno.")
     }
 
     // MARK: - Website icons

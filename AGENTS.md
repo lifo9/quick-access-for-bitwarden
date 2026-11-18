@@ -33,11 +33,13 @@ exercises the packaging with an ad hoc signature.
 - `Sources/QuickAccessCore`: everything without UI, with no AppKit: crypto, reading the desktop
   state file, vault decryption, one-time codes, search ranking, lock policy, the IPC client.
 - `Sources/QuickAccessForBitwarden`: the app: hot key, panel, model, session, clipboard, icons.
+  `AppStrings.swift` holds every text the app shows, in English, Slovak and Czech; a new text
+  goes in all three, and what the core reports (field names, reasons) stays a type until there.
   `Demo/` holds an invented vault (`--demo`, `just demo`) and the recorder of the README's
   screencast (`just screencast`); rerun the recorder after a change to the panel's look.
 - `Tests/TestSupport`: test vectors and the state file builder, shared by both test targets.
 - `scripts/`: building the app bundle and the disk image, and the release that signs and
-  notarizes them. `Gemfile` pins fastlane, which the release uses only to fetch the certificate.
+  notarizes them. `make-app-icon.swift` draws `Bundle/AppIcon.icns` (`just icon`). `Gemfile` pins fastlane, which the release uses only to fetch the certificate.
 
 ## Rules
 

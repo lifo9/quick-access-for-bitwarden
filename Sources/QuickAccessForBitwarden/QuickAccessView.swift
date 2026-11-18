@@ -68,7 +68,7 @@ struct QuickAccessView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 26)
             TextField(
-                "Search Bitwarden",
+                model.strings.searchPlaceholder,
                 text: Binding(get: { model.query }, set: { model.updateQuery($0) })
             )
             .textFieldStyle(.plain)
@@ -101,17 +101,17 @@ struct QuickAccessView: View {
     @ViewBuilder
     private var content: some View {
         switch model.session.state {
-        case .locked(let explanation):
+        case .locked(let failure):
             StatusMessage(
                 symbolName: "lock.fill",
-                title: "Bitwarden is locked",
-                detail: explanation ?? "Press Return to unlock with Touch ID."
+                title: model.strings.lockedTitle,
+                detail: failure.map(model.strings.text(of:)) ?? model.strings.lockedHint
             )
         case .unlocking:
             StatusMessage(
                 symbolName: "touchid",
-                title: "Unlocking…",
-                detail: "Confirm the Touch ID prompt from Bitwarden."
+                title: model.strings.unlockingTitle,
+                detail: model.strings.unlockingHint
             )
         case .unlocked(let vault):
             switch model.mode {
@@ -131,10 +131,10 @@ struct QuickAccessView: View {
         if items.isEmpty {
             StatusMessage(
                 symbolName: "magnifyingglass",
-                title: "No items found",
+                title: model.strings.noItemsTitle,
                 detail: numUndecryptableItems > 0
-                    ? "\(numUndecryptableItems) items use a format that is not supported."
-                    : "Nothing in your vault matches “\(model.query)”."
+                    ? model.strings.unsupportedItems(numUndecryptableItems)
+                    : model.strings.nothingMatches(model.query)
             )
         } else {
             SelectableList(
@@ -179,7 +179,7 @@ struct QuickAccessView: View {
             rowContent: { actionIndex, isSelected in
                 let action = actions[actionIndex]
                 HStack {
-                    Text(action.title)
+                    Text(model.strings.title(of: action))
                         .font(.system(size: 14))
                         .lineLimit(1)
                     Spacer()
@@ -198,7 +198,7 @@ struct QuickAccessView: View {
     private var footer: some View {
         HStack(spacing: 14) {
             if let notice = model.notice {
-                Label(notice, systemImage: "exclamationmark.triangle.fill")
+                Label(model.strings.text(of: notice), systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .lineLimit(1)
             } else {
@@ -225,14 +225,18 @@ struct QuickAccessView: View {
     }
 
     private var footerHints: [String] {
+        let strings = model.strings
         guard model.session.isUnlocked else {
-            return ["↩ Unlock"]
+            return [strings.hintUnlock]
         }
         switch model.mode {
         case .items:
-            return ["↩ Copy", "→ Actions", "⌘C Username", "⇧⌘C Password", "⌥⌘C One-time code", "⌥↩ Open website"]
+            return [
+                strings.hintCopy, strings.hintActions, strings.hintUsername, strings.hintPassword,
+                strings.hintOneTimeCode, strings.hintOpenWebsite,
+            ]
         case .actions:
-            return ["↩ Run", "← Back"]
+            return [strings.hintRun, strings.hintBack]
         }
     }
 }

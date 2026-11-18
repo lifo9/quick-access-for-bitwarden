@@ -15,9 +15,10 @@ swift build --package-path "$repo_root" --configuration release --product "$exec
 binaries_directory="$(swift build --package-path "$repo_root" --configuration release --show-bin-path)"
 
 rm -rf "$app_bundle"
-mkdir -p "$app_bundle/Contents/MacOS"
+mkdir -p "$app_bundle/Contents/MacOS" "$app_bundle/Contents/Resources"
 cp "$binaries_directory/$executable_name" "$app_bundle/Contents/MacOS/$executable_name"
 cp "$repo_root/Bundle/Info.plist" "$app_bundle/Contents/Info.plist"
+cp "$repo_root/Bundle/AppIcon.icns" "$app_bundle/Contents/Resources/AppIcon.icns"
 
 code_sign_options=(--force --options runtime --sign "$code_sign_identity")
 if [ "$code_sign_identity" != "-" ]; then

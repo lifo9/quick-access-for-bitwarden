@@ -10,9 +10,18 @@ struct ItemAction: Identifiable {
     }
 
     let id: String
-    let title: String
     let shortcutHint: String?
     let effect: Effect
+}
+
+/// Why the last command did nothing, for the panel to say in the user's language.
+enum PanelNotice: Equatable {
+    case itemHasNoWebsite(itemName: String)
+    case itemHasNoSuchField(itemName: String)
+    case websiteCannotBeOpened
+    case masterPasswordRepromptRequired
+    case authenticatorKeyIsNotValid
+    case valueCouldNotBeRead
 }
 
 /// The state and the commands of the quick access panel.
@@ -30,14 +39,15 @@ final class QuickAccessModel {
     private let clipboard: ClipboardWriter
     private let usageStore: UsageStore
     private let openInBrowser: (URL) -> Void
+    private let preferredSystemLanguages: [String]
 
     private(set) var query = ""
     private(set) var matchingItems = [VaultItem]()
     private(set) var selectedItemIndex = 0
     private(set) var mode = Mode.items
     private(set) var selectedActionIndex = 0
-    /// A short message about the last command, such as why a value could not be copied.
-    private(set) var notice: String?
+    /// Why the last command did nothing, such as why a value could not be copied.
+    private(set) var notice: PanelNotice?
     /// Changes whenever the search field should take the keyboard focus.
     private(set) var focusRequestCount = 0
 
@@ -52,19 +62,31 @@ final class QuickAccessModel {
         iconStore: WebsiteIconStore,
         clipboard: ClipboardWriter,
         usageStore: UsageStore,
-        openInBrowser: @escaping (URL) -> Void
+        openInBrowser: @escaping (URL) -> Void,
+        preferredSystemLanguages: [String] = Locale.preferredLanguages
     ) {
         self.session = session
         self.iconStore = iconStore
         self.clipboard = clipboard
         self.usageStore = usageStore
         self.openInBrowser = openInBrowser
+        self.preferredSystemLanguages = preferredSystemLanguages
         // The items carry their keys, so a locked session must not leave them in the panel;
         // the icons would still tell which websites the vault holds.
         session.didLock = { [weak self] in
             self?.refreshMatchingItems()
             self?.iconStore.forgetAll()
         }
+    }
+
+    /// The app's texts in the language the Bitwarden desktop app is set to, or the system's
+    /// when it follows the system.
+    var strings: AppStrings {
+        AppStrings.strings(
+            for: AppLanguage.resolve(
+                desktopLocale: session.settings.desktopLocale,
+                preferredSystemLanguages: preferredSystemLanguages
+            ))
     }
 
     var selectedItem: VaultItem? {
@@ -217,7 +239,7 @@ final class QuickAccessModel {
             return
         }
         guard let websiteField = item.firstField(withRole: .website) else {
-            notice = "\(item.name) has no website."
+            notice = .itemHasNoWebsite(itemName: item.name)
             return
         }
         perform(.openWebsite(websiteField), on: item)
@@ -250,7 +272,7 @@ final class QuickAccessModel {
             return
         }
         guard let field = select(item) else {
-            notice = "\(item.name) has no such field."
+            notice = .itemHasNoSuchField(itemName: item.name)
             return
         }
         perform(.copy(field), on: item)
@@ -275,7 +297,7 @@ final class QuickAccessModel {
                 )
             case .openWebsite(let field):
                 guard let websiteUrl = Self.makeWebsiteUrl(try item.revealValue(of: field)) else {
-                    notice = "This website address cannot be opened in a browser."
+                    notice = .websiteCannotBeOpened
                     return
                 }
                 openInBrowser(websiteUrl)
@@ -284,11 +306,11 @@ final class QuickAccessModel {
             session.noteUse()
             dismissPanel()
         } catch VaultError.masterPasswordRepromptRequired {
-            notice = "This item asks for the master password again. Open it in Bitwarden."
+            notice = .masterPasswordRepromptRequired
         } catch is TotpError {
-            notice = "The authenticator key of this item is not valid."
+            notice = .authenticatorKeyIsNotValid
         } catch {
-            notice = "This value could not be read."
+            notice = .valueCouldNotBeRead
         }
     }
 
@@ -333,11 +355,10 @@ final class QuickAccessModel {
                 return [
                     ItemAction(
                         id: "open.\(field.id)",
-                        title: "Open Website",
                         shortcutHint: field.id == firstWebsiteFieldId ? "⌥↩" : nil,
                         effect: .openWebsite(field)
                     ),
-                    ItemAction(id: "copy.\(field.id)", title: "Copy Website", shortcutHint: nil, effect: .copy(field)),
+                    ItemAction(id: "copy.\(field.id)", shortcutHint: nil, effect: .copy(field)),
                 ]
             }
             let shortcutHint: String? =
@@ -351,9 +372,7 @@ final class QuickAccessModel {
                     nil
                 }
             return [
-                ItemAction(
-                    id: "copy.\(field.id)", title: "Copy \(field.label)", shortcutHint: shortcutHint,
-                    effect: .copy(field))
+                ItemAction(id: "copy.\(field.id)", shortcutHint: shortcutHint, effect: .copy(field))
             ]
         }
     }

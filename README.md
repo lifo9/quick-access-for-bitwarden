@@ -28,6 +28,7 @@ an independent project, not affiliated with, endorsed by or sponsored by Bitward
   | Clear clipboard                | When a copied value is removed from the clipboard                |
   | Unlock with Touch ID           | Must be on; it is the only way to unlock                         |
   | Show website icons             | Whether icons are fetched, from the account's icon service       |
+  | Language                       | The language of the panel, where it is English, Slovak or Czech  |
   | Master password re-prompt      | Only username and website of such items can be copied            |
   | "View password" off (shared)   | Password, one-time code and hidden fields are not offered        |
 
@@ -82,6 +83,12 @@ used most often, then favorites.
 Drag the panel by any empty part of it to move it, and by its edges to resize it; it comes back
 where and how it was left. It is an ordinary window, so window managers can place it too. It
 follows the light or dark appearance of the Mac.
+
+The panel is in English, Slovak or Czech: in the language the Bitwarden desktop app is set to,
+or the Mac's first language when Bitwarden follows the system.
+
+The menu bar icon can be hidden from its menu, or dragged out of the menu bar with the Command
+key held. Opening the app again, from Spotlight or the Applications folder, brings it back.
 
 On macOS versions where the system uses ⇧⌘Space itself ("Ask Siri about active window"), switch
 that shortcut off under System Settings → Keyboard → Keyboard Shortcuts.

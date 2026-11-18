@@ -2,6 +2,55 @@ import AppKit
 import Observation
 import QuickAccessCore
 
+/// Why the vault stayed locked, for the panel to say in the user's language.
+enum UnlockFailure: Equatable {
+    case touchIdWasCancelled
+    case masterPasswordNeededFirst
+    case touchIdSwitchedOffInBitwarden
+    case touchIdNotAvailable
+    case cannotUnlockWithTouchId(status: String)
+    case desktopAppNotInstalled
+    case noAccountLoggedIn
+    case unsupportedAccountEncryption
+    case desktopAppDidNotAnswer
+    case desktopAppUsesAnotherAccount
+    case keyOfAnotherAccount
+    case other(description: String)
+
+    init(_ status: BiometricsStatus) {
+        switch status {
+        case .unlockNeeded:
+            self = .masterPasswordNeededFirst
+        case .notEnabledLocally, .notEnabledInConnectedDesktopApp:
+            self = .touchIdSwitchedOffInBitwarden
+        case .hardwareUnavailable:
+            self = .touchIdNotAvailable
+        case .available, .autoSetupNeeded, .manualSetupNeeded, .platformUnsupported, .desktopDisconnected,
+            .nativeMessagingPermissionMissing:
+            self = .cannotUnlockWithTouchId(status: "\(status)")
+        }
+    }
+
+    init(_ error: Error) {
+        switch error {
+        case InstalledDesktopApp.LocationError.desktopAppNotInstalled:
+            self = .desktopAppNotInstalled
+        case InstalledDesktopApp.LocationError.stateFileNotFound, DesktopStateError.noActiveAccount:
+            self = .noAccountLoggedIn
+        case DesktopStateError.unsupportedAccountEncryption:
+            self = .unsupportedAccountEncryption
+        case DesktopIpcError.noReply:
+            self = .desktopAppDidNotAnswer
+        case DesktopIpcError.accountNotLoggedIntoDesktopApp:
+            self = .desktopAppUsesAnotherAccount
+        case VaultError.userKeyDoesNotMatchAccount:
+            self = .keyOfAnotherAccount
+        default:
+            self = .other(description: "\(error)")
+        }
+    }
+}
+
 /// Holds the unlocked vault and decides when to drop it again.
 ///
 /// The user key only ever lives in this object's memory. Unlocking asks the Bitwarden desktop app
@@ -10,14 +59,14 @@ import QuickAccessCore
 @Observable
 final class VaultSession {
     enum State {
-        case locked(explanation: String?)
+        case locked(failure: UnlockFailure?)
         case unlocking
         case unlocked(UnlockedVault)
     }
 
     private static let periodicCheckInterval: TimeInterval = 30
 
-    private(set) var state = State.locked(explanation: nil)
+    private(set) var state = State.locked(failure: nil)
     private(set) var settings = DesktopSettings(
         vaultTimeout: VaultTimeout.desktopDefault,
         clipboardClearDelay: ClipboardClearDelay.desktopDefault,
@@ -102,55 +151,62 @@ final class VaultSession {
             // shows up as a change at the next reload instead of counting as already seen.
             let stateFileModificationDate = try desktop.readStateModificationDate()
             let desktopState = try desktop.loadState()
+            // The settings hold whether or not the unlock succeeds: a refusal is explained in
+            // the language they name.
+            self.stateFileModificationDate = stateFileModificationDate
+            settings = desktopState.settings
             let outcome = try await desktop.requestUnlock(userId: desktopState.userId)
             switch outcome {
             case .unlocked(let userKey):
                 let vault = try VaultDecryptor.unlock(desktopState, userKey: userKey)
                 self.userKey = userKey
                 self.unlockedUserId = desktopState.userId
-                self.stateFileModificationDate = stateFileModificationDate
-                settings = desktopState.settings
                 lastUseDate = currentDate()
                 state = .unlocked(vault)
             case .denied:
-                state = .locked(explanation: "Touch ID was cancelled.")
+                state = .locked(failure: .touchIdWasCancelled)
             case .unavailable(let status):
-                state = .locked(explanation: Self.explain(status))
+                state = .locked(failure: UnlockFailure(status))
             }
         } catch {
-            state = .locked(explanation: Self.explain(error))
+            state = .locked(failure: UnlockFailure(error))
         }
     }
 
     func lock() {
         userKey = nil
         unlockedUserId = nil
-        state = .locked(explanation: nil)
+        state = .locked(failure: nil)
         didLock()
     }
 
-    /// Picks up what the desktop app has synced or changed since the vault was decrypted.
+    /// Picks up what the desktop app has synced or changed: its settings always, which decide
+    /// among other things the language of the panel, and the vault when it is unlocked here.
     func reloadIfDesktopStateChanged() {
-        guard case .unlocked = state, let userKey else {
-            return
-        }
         do {
             let currentModificationDate = try desktop.readStateModificationDate()
             guard currentModificationDate != stateFileModificationDate else {
                 return
             }
             let desktopState = try desktop.loadState()
+            stateFileModificationDate = currentModificationDate
+            settings = desktopState.settings
+            guard case .unlocked = state, let userKey else {
+                return
+            }
             // A different account in the desktop app means this key is for the wrong vault.
             guard desktopState.userId == unlockedUserId else {
                 lock()
                 return
             }
-            stateFileModificationDate = currentModificationDate
-            settings = desktopState.settings
             state = .unlocked(try VaultDecryptor.unlock(desktopState, userKey: userKey))
         } catch {
-            lock()
-            state = .locked(explanation: Self.explain(error))
+            // While locked there is nothing to drop; unlocking reads the state again and says
+            // what is wrong with it.
+            if isUnlocked {
+                lock()
+                state = .locked(failure: UnlockFailure(error))
+            }
         }
     }
 
@@ -193,38 +249,5 @@ final class VaultSession {
             return
         }
         lock()
-    }
-
-    private static func explain(_ status: BiometricsStatus) -> String {
-        switch status {
-        case .unlockNeeded:
-            "Bitwarden needs your master password once after it starts. Unlock Bitwarden, then try again."
-        case .notEnabledLocally, .notEnabledInConnectedDesktopApp:
-            "Unlock with Touch ID is switched off in Bitwarden's settings."
-        case .hardwareUnavailable:
-            "Touch ID is not available right now."
-        case .available, .autoSetupNeeded, .manualSetupNeeded, .platformUnsupported, .desktopDisconnected,
-            .nativeMessagingPermissionMissing:
-            "Bitwarden cannot unlock with Touch ID right now (\(status))."
-        }
-    }
-
-    private static func explain(_ error: Error) -> String {
-        switch error {
-        case InstalledDesktopApp.LocationError.desktopAppNotInstalled:
-            "The Bitwarden desktop app is not installed."
-        case InstalledDesktopApp.LocationError.stateFileNotFound, DesktopStateError.noActiveAccount:
-            "No account is logged in to the Bitwarden desktop app."
-        case DesktopStateError.unsupportedAccountEncryption:
-            "This account uses a newer encryption format that is not supported yet."
-        case DesktopIpcError.noReply:
-            "Bitwarden did not answer. Check that the desktop app is running."
-        case DesktopIpcError.accountNotLoggedIntoDesktopApp:
-            "The Bitwarden desktop app is logged in to a different account."
-        case VaultError.userKeyDoesNotMatchAccount:
-            "Bitwarden handed over a key for a different account. Try again."
-        default:
-            "Unlocking failed: \(error)"
-        }
     }
 }

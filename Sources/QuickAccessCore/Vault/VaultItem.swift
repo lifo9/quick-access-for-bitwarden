@@ -19,12 +19,64 @@ public enum VaultFieldRole: Sendable, Equatable {
     case other
 }
 
+/// What a field holds, for the app to name it in the user's language. The names of custom
+/// fields are the user's own.
+public enum VaultFieldName: Hashable, Sendable {
+    case username
+    case password
+    case oneTimeCode
+    case website
+    case notes
+    case cardNumber
+    case cardSecurityCode
+    case cardholderName
+    case cardExpirationMonth
+    case cardExpirationYear
+    case cardBrand
+    case identityEmail
+    case identityUsername
+    case identityPhone
+    case identityTitle
+    case identityFirstName
+    case identityMiddleName
+    case identityLastName
+    case identityCompany
+    case identityAddress1
+    case identityAddress2
+    case identityAddress3
+    case identityCity
+    case identityState
+    case identityPostalCode
+    case identityCountry
+    case identitySocialSecurityNumber
+    case identityPassportNumber
+    case identityLicenseNumber
+    case sshPublicKey
+    case sshKeyFingerprint
+    case sshPrivateKey
+    /// A custom field, with the name the user gave it.
+    case custom(String)
+    /// A custom field without a name; the number is its place among the item's custom fields.
+    case unnamedCustom(Int)
+
+    /// Every name except those of custom fields: the ones that need a text in each language.
+    public static let standardNames: [VaultFieldName] = [
+        .username, .password, .oneTimeCode, .website, .notes,
+        .cardNumber, .cardSecurityCode, .cardholderName, .cardExpirationMonth, .cardExpirationYear, .cardBrand,
+        .identityEmail, .identityUsername, .identityPhone, .identityTitle, .identityFirstName,
+        .identityMiddleName, .identityLastName, .identityCompany, .identityAddress1, .identityAddress2,
+        .identityAddress3, .identityCity, .identityState, .identityPostalCode, .identityCountry,
+        .identitySocialSecurityNumber, .identityPassportNumber, .identityLicenseNumber,
+        .sshPublicKey, .sshKeyFingerprint, .sshPrivateKey,
+    ]
+}
+
 /// One copyable value of an item. The value itself stays encrypted until `VaultItem.revealValue`
 /// is called, so that secrets are only in memory in the clear while they are being used.
 public struct VaultField: Identifiable, Sendable, Equatable {
     /// Unique within its item.
     public let id: String
-    public let label: String
+    public let name: VaultFieldName
     public let role: VaultFieldRole
     /// Whether the desktop app hides this value behind a "reveal" toggle.
     public let isConcealed: Bool

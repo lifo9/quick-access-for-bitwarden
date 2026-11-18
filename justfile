@@ -26,6 +26,10 @@ install: bundle
     cp -R "build/Quick Access for Bitwarden.app" "$installed_app"
     open "$installed_app"
 
+# Redraw the app icon after a change to scripts/make-app-icon.swift.
+icon:
+    swift scripts/make-app-icon.swift Bundle/AppIcon.icns
+
 # Run the app against an invented vault instead of the Bitwarden desktop app: no Touch ID, no
 # real data.
 demo:

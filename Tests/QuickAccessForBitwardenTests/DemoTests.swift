@@ -21,7 +21,7 @@ final class DemoTests: XCTestCase {
         for item in vault.items {
             XCTAssertFalse(item.name.isEmpty)
             for field in item.fields {
-                XCTAssertNoThrow(try item.revealValue(of: field), "\(item.name): \(field.label)")
+                XCTAssertNoThrow(try item.revealValue(of: field), "\(item.name): \(field.name)")
             }
             if let oneTimeCodeField = item.firstField(withRole: .oneTimeCode) {
                 XCTAssertNoThrow(try TotpConfiguration(authenticatorKey: item.revealValue(of: oneTimeCodeField)))
