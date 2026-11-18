@@ -193,7 +193,10 @@ public struct DesktopBiometricsClient: Sendable {
         let userId: String
         let sessionSecret: SymmetricCryptoKey
         let currentDate: @Sendable () -> Date
-        var nextMessageId = 1
+        /// Starts at a random number: the desktop app answers a client id under its latest
+        /// session, so a late reply to an earlier conversation could otherwise carry the
+        /// number this one is waiting for.
+        var nextMessageId = Int.random(in: 1...1_000_000_000)
 
         mutating func request(command: String) async throws -> CommandReply {
             let messageId = nextMessageId

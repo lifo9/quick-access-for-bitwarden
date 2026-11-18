@@ -60,6 +60,8 @@ final class GlobalHotKey {
             &hotKeyReference
         )
         guard registrationStatus == noErr else {
+            // The handler points at this object, which does not outlive a failed initializer.
+            RemoveEventHandler(eventHandlerReference)
             throw RegistrationError.failed(status: registrationStatus)
         }
     }

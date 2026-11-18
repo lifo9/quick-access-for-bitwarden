@@ -30,7 +30,7 @@ public enum LockPolicy {
         case (.onSystemIdle, _):
             false
         case (.afterMinutes(let minutes), .periodicCheck(_, let secondsSinceLastUse)):
-            secondsSinceLastUse >= TimeInterval(minutes * 60)
+            secondsSinceLastUse >= TimeInterval(minutes) * 60
         case (.afterMinutes, _):
             false
         case (.unrecognized, .periodicCheck(let systemIdleSeconds, _)):

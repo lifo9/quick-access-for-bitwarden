@@ -14,19 +14,19 @@ public enum VaultSearch {
         let queryWords = normalize(query).split(separator: " ").map(String.init)
         let normalizedAppName = frontmostAppName.map(normalize) ?? ""
 
-        let scoredItems: [(item: VaultItem, score: Int)] = items.compactMap { item in
+        let scoredItems: [(item: VaultItem, score: Int, normalizedName: String)] = items.compactMap { item in
             let searchableItem = SearchableItem(item)
             if queryWords.isEmpty {
                 let isNamedAfterFrontmostApp =
                     !normalizedAppName.isEmpty
                     && searchableItem.name.contains(normalizedAppName)
-                return (item, isNamedAfterFrontmostApp ? 1 : 0)
+                return (item, isNamedAfterFrontmostApp ? 1 : 0, searchableItem.name)
             }
             let wordScores = queryWords.map(searchableItem.score(forQueryWord:))
             guard !wordScores.contains(0) else {
                 return nil
             }
-            return (item, wordScores.reduce(0, +))
+            return (item, wordScores.reduce(0, +), searchableItem.name)
         }
 
         let rankedItems = scoredItems.sorted { first, second in
@@ -36,7 +36,7 @@ public enum VaultSearch {
                 return firstSortKey > secondSortKey
             }
             // The id breaks ties between items of the same name, to keep the order stable.
-            return (normalize(first.item.name), first.item.id) < (normalize(second.item.name), second.item.id)
+            return (first.normalizedName, first.item.id) < (second.normalizedName, second.item.id)
         }
         return rankedItems.map(\.item)
     }

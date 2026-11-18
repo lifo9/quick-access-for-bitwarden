@@ -117,7 +117,10 @@ struct QuickAccessView: View {
 
     @ViewBuilder
     private func itemList(numUndecryptableItems: Int) -> some View {
-        if model.matchingItems.isEmpty {
+        // One snapshot for the row ids and the rows: a row drawn late must not index into a
+        // list that has shrunk since.
+        let items = model.matchingItems
+        if items.isEmpty {
             StatusMessage(
                 symbolName: "magnifyingglass",
                 title: "No items found",
@@ -127,12 +130,12 @@ struct QuickAccessView: View {
             )
         } else {
             SelectableList(
-                rowIds: model.matchingItems.map(\.id),
+                rowIds: items.map(\.id),
                 selectedRowIndex: model.selectedItemIndex,
                 rowHeight: Self.rowHeight,
                 onActivate: { model.activateItem(at: $0) },
                 rowContent: { itemIndex, isSelected in
-                    let item = model.matchingItems[itemIndex]
+                    let item = items[itemIndex]
                     HStack(spacing: 12) {
                         ItemIcon(kind: item.kind)
                         VStack(alignment: .leading, spacing: 1) {

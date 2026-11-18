@@ -24,6 +24,10 @@ final class LockPolicyTests: XCTestCase {
         XCTAssertTrue(LockPolicy.shouldLock(vaultTimeout: .afterMinutes(0), on: check()))
     }
 
+    func test_shouldLock__copesWithATimeoutTooLongToCountInSeconds() {
+        XCTAssertFalse(LockPolicy.shouldLock(vaultTimeout: .afterMinutes(.max), on: check(secondsSinceLastUse: 10)))
+    }
+
     func test_shouldLock__onSleepAndOnScreenLockedReactToTheirEventOnly() {
         XCTAssertTrue(LockPolicy.shouldLock(vaultTimeout: .onSleep, on: .systemWillSleep))
         XCTAssertFalse(LockPolicy.shouldLock(vaultTimeout: .onSleep, on: .screenLocked))

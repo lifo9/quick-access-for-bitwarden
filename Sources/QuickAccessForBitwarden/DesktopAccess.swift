@@ -23,25 +23,30 @@ struct InstalledDesktopApp: DesktopAccess {
         case stateFileNotFound
     }
 
-    /// The helper inside the desktop app's bundle that relays messages to the running app.
-    func locateProxyExecutable() throws -> URL {
+    private func locateAppBundle() throws -> URL {
         guard let appBundle = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.bundleIdentifier) else {
             throw LocationError.desktopAppNotInstalled
         }
-        return appBundle.appending(path: "Contents/MacOS/desktop_proxy")
+        return appBundle
+    }
+
+    /// The helper inside the desktop app's bundle that relays messages to the running app.
+    func locateProxyExecutable() throws -> URL {
+        try locateAppBundle().appending(path: "Contents/MacOS/desktop_proxy")
     }
 
     func locateStateFile() throws -> URL {
-        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-        let candidates = [
-            // The build downloaded from bitwarden.com.
-            homeDirectory.appending(path: "Library/Application Support/Bitwarden/data.json"),
-            // The Mac App Store build keeps its data in its sandbox container.
-            homeDirectory.appending(
-                path: "Library/Containers/\(Self.bundleIdentifier)/Data/Library/Application Support/Bitwarden/data.json"
-            ),
-        ]
-        guard let stateFile = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
+        // The Mac App Store build is sandboxed and keeps its data in its container; the build
+        // from bitwarden.com does not. The installed build decides where to look: a file left
+        // behind by the other build would be stale and belong to another session.
+        let appStoreReceipt = try locateAppBundle().appending(path: "Contents/_MASReceipt/receipt")
+        let isMacAppStoreBuild = FileManager.default.fileExists(atPath: appStoreReceipt.path)
+        let stateFilePath =
+            isMacAppStoreBuild
+            ? "Library/Containers/\(Self.bundleIdentifier)/Data/Library/Application Support/Bitwarden/data.json"
+            : "Library/Application Support/Bitwarden/data.json"
+        let stateFile = FileManager.default.homeDirectoryForCurrentUser.appending(path: stateFilePath)
+        guard FileManager.default.fileExists(atPath: stateFile.path) else {
             throw LocationError.stateFileNotFound
         }
         return stateFile

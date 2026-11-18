@@ -23,10 +23,15 @@ private final class FakeDesktopApp: DesktopTransport, @unchecked Sendable {
     private let sessionSecret = try! SymmetricCryptoKey(encodedKey: Data(repeating: 3, count: 64))
     private let lock = NSLock()
     private var commands = [String]()
+    private var messageIds = [Int]()
     private var closed = false
 
     var receivedCommands: [String] {
         lock.withLock { commands }
+    }
+
+    var receivedMessageIds: [Int] {
+        lock.withLock { messageIds }
     }
 
     var isClosed: Bool {
@@ -83,7 +88,10 @@ private final class FakeDesktopApp: DesktopTransport, @unchecked Sendable {
         )
         let request = try JSONSerialization.jsonObject(with: requestJson) as! [String: Any]
         let command = request["command"] as! String
-        lock.withLock { commands.append(command) }
+        lock.withLock {
+            commands.append(command)
+            messageIds.append(request["messageId"] as! Int)
+        }
 
         guard !behavior.closesConnectionInsteadOfReplying else {
             close()
@@ -186,6 +194,19 @@ final class DesktopBiometricsClientTests: XCTestCase {
         let status = try await makeClient(desktopApp).requestStatus(userId: Self.userId)
 
         XCTAssertEqual(status, .notEnabledInConnectedDesktopApp)
+    }
+
+    func test_requestStatus__numbersItsRequestsDifferentlyInEveryConversation() async throws {
+        // The desktop app answers a client id under its latest session, so a late reply to an
+        // earlier conversation must not carry a number the current one is waiting for.
+        let firstDesktopApp = FakeDesktopApp()
+        let secondDesktopApp = FakeDesktopApp()
+
+        _ = try await makeClient(firstDesktopApp).requestStatus(userId: Self.userId)
+        _ = try await makeClient(secondDesktopApp).requestStatus(userId: Self.userId)
+
+        XCTAssertEqual(firstDesktopApp.receivedMessageIds.count, 1)
+        XCTAssertNotEqual(firstDesktopApp.receivedMessageIds, secondDesktopApp.receivedMessageIds)
     }
 
     func test_requestStatus__throwsNoReplyWhenDesktopClosesTheConnection() async throws {
