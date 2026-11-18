@@ -8,9 +8,13 @@ final class ClipboardWriter {
     /// A marker many clipboard managers honor by not recording the entry (nspasteboard.org).
     private static let concealedType = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
 
-    private let pasteboard = NSPasteboard.general
+    private let pasteboard: NSPasteboard
     private var changeCountOfOwnCopy: Int?
     private var pendingClear: Task<Void, Never>?
+
+    init(pasteboard: NSPasteboard = .general) {
+        self.pasteboard = pasteboard
+    }
 
     func copy(_ text: String, isConcealed: Bool, clearDelay: ClipboardClearDelay) {
         pasteboard.clearContents()

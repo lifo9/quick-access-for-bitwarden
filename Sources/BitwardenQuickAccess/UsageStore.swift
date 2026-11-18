@@ -6,14 +6,16 @@ import Foundation
 final class UsageStore {
     private static let defaultsKey = "numUsesByItemId"
 
+    private let defaults: UserDefaults
     private(set) var numUsesByItemId: [String: Int]
 
-    init() {
-        numUsesByItemId = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: Int] ?? [:]
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        numUsesByItemId = defaults.dictionary(forKey: Self.defaultsKey) as? [String: Int] ?? [:]
     }
 
     func recordUse(ofItemWithId itemId: String) {
         numUsesByItemId[itemId, default: 0] += 1
-        UserDefaults.standard.set(numUsesByItemId, forKey: Self.defaultsKey)
+        defaults.set(numUsesByItemId, forKey: Self.defaultsKey)
     }
 }

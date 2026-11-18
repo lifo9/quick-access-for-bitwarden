@@ -1,30 +1,15 @@
 import Foundation
 @testable import QuickAccessCore
+import QuickAccessTestSupport
 import XCTest
 
 final class VaultDecryptorTests: XCTestCase {
-    private let userId = "11111111-2222-3333-4444-555555555555"
-    private let organizationId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    private let userId = StateFileBuilder.userId
+    private let organizationId = StateFileBuilder.organizationId
     private let itemKey = try! SymmetricCryptoKey(encodedKey: Data(repeating: 9, count: 64))
 
-    /// A state file like the desktop app writes, holding the given items.
     private func makeStateFile(ciphers: [[String: Any]], settings: [String: Any] = [:]) throws -> Data {
-        let ciphersById = Dictionary(uniqueKeysWithValues: ciphers.map { ($0["id"] as! String, $0) })
-        let accountState: [String: Any] = [
-            "global_account_activeAccountId": userId,
-            "user_\(userId)_crypto_accountCryptographicState": [
-                "V1": ["private_key": Fixtures.encrypt(Fixtures.pkcs8PrivateKey, with: Fixtures.userKey)],
-            ],
-            "user_\(userId)_crypto_organizationKeys": [
-                organizationId: [
-                    "type": "organization",
-                    "key": "4." + Fixtures.wrappedOrganizationKey.base64EncodedString(),
-                ],
-            ],
-            "user_\(userId)_ciphers_ciphers": ciphersById,
-        ]
-        let stateFile = accountState.merging(settings) { _, setting in setting }
-        return try JSONSerialization.data(withJSONObject: stateFile)
+        try StateFileBuilder.makeStateFile(ciphers: ciphers, settings: settings)
     }
 
     private func unlock(ciphers: [[String: Any]]) throws -> UnlockedVault {
@@ -38,24 +23,7 @@ final class VaultDecryptorTests: XCTestCase {
         key: SymmetricCryptoKey = Fixtures.userKey,
         extra: [String: Any] = [:]
     ) -> [String: Any] {
-        let login: [String: Any] = [
-            "username": Fixtures.encrypt("alice@example.com", with: key),
-            "password": Fixtures.encrypt("correct horse", with: key),
-            "totp": Fixtures.encrypt("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", with: key),
-            "uris": [["uri": Fixtures.encrypt("https://example.com/login", with: key), "match": NSNull()]],
-        ]
-        let cipher: [String: Any] = [
-            "id": id,
-            "type": 1,
-            "name": Fixtures.encrypt(name, with: key),
-            "notes": NSNull(),
-            "favorite": false,
-            "reprompt": 0,
-            "viewPassword": true,
-            "deletedDate": NSNull(),
-            "login": login,
-        ]
-        return cipher.merging(extra) { _, override in override }
+        StateFileBuilder.makeLogin(id: id, name: name, key: key, extra: extra)
     }
 
     private func revealValue(ofFieldWithRole role: VaultFieldRole, in item: VaultItem) throws -> String {

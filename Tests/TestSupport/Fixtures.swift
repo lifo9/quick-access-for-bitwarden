@@ -1,11 +1,11 @@
 import Foundation
-@testable import QuickAccessCore
+import QuickAccessCore
 import Security
 
 /// Test vectors produced by OpenSSL, so the tests compare this package's cryptography against an
 /// independent implementation. The RSA key pair exists only for these tests.
-enum Fixtures {
-    static let pkcs8PrivateKey = decodeBase64("""
+public enum Fixtures {
+    public static let pkcs8PrivateKey = decodeBase64("""
     MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDXtirBgmYRz1JgPRB3ZUHTCpv+
     ayNxud8KfEmzc0KWTrahI4cFG6cWoXfVQ5jaaU9+r5Rj1L4B4inPOyhI+2nquov+hEhREaQnf8at
     d9fAE4IYDpyeVpkVh58Yd4Mo4iH95krBo2dMeRmZQ0loBSpvs0jUaR44c3UDfg2hh6rfK3Gq3hzy
@@ -30,7 +30,7 @@ enum Fixtures {
     bPAKndt8EmPt7wO67zfmZ+FpB/71
     """)
 
-    static let subjectPublicKeyInfo = decodeBase64("""
+    public static let subjectPublicKeyInfo = decodeBase64("""
     MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA17YqwYJmEc9SYD0Qd2VB0wqb/msjcbnf
     CnxJs3NClk62oSOHBRunFqF31UOY2mlPfq+UY9S+AeIpzzsoSPtp6rqL/oRIURGkJ3/GrXfXwBOC
     GA6cnlaZFYefGHeDKOIh/eZKwaNnTHkZmUNJaAUqb7NI1GkeOHN1A34NoYeq3ytxqt4c8kPIABit
@@ -39,7 +39,7 @@ enum Fixtures {
     VKH+ewIDAQAB
     """)
 
-    static let pkcs1PublicKey = decodeBase64("""
+    public static let pkcs1PublicKey = decodeBase64("""
     MIIBCgKCAQEA17YqwYJmEc9SYD0Qd2VB0wqb/msjcbnfCnxJs3NClk62oSOHBRunFqF31UOY2mlP
     fq+UY9S+AeIpzzsoSPtp6rqL/oRIURGkJ3/GrXfXwBOCGA6cnlaZFYefGHeDKOIh/eZKwaNnTHkZ
     mUNJaAUqb7NI1GkeOHN1A34NoYeq3ytxqt4c8kPIABitfNCyA08/hYvH+iScBsZEtraS0S94uoE+
@@ -48,7 +48,7 @@ enum Fixtures {
     """)
 
     /// The organization key below, wrapped with RSA-OAEP-SHA1 for the key pair above.
-    static let wrappedOrganizationKey = decodeBase64("""
+    public static let wrappedOrganizationKey = decodeBase64("""
     pJdVCyg0OeYXK7beqbGfoUQJDtG5qTJAtp2j9a9pCG4XEvXHPP7iIq6gEPxL6mbc2sH/W5vZfVoM
     R7XjboFnJ1J+Wzw/K8uBZTnqh1yI27zMSK9wSUD4ZpLLl1cNiRC1VyhbtTh1zsSfVDCiaXQc1J5B
     +AHBRmtpw3pfqK6SyWbOVhOtNbwFLbXecm6xJQKOag0upt5w/BowyUrD9GC2Ehus4vN6M1jGs1MO
@@ -56,39 +56,38 @@ enum Fixtures {
     oJ0aYOODL5MECkIYiwSnw+lCs1QXa7pXUc+8Fw==
     """)
 
-    static let organizationKey = try! SymmetricCryptoKey(encodedKey: Data(100 ..< 164))
+    public static let organizationKey = try! SymmetricCryptoKey(encodedKey: Data(100 ..< 164))
 
     /// AES-256-CBC + HMAC-SHA256 of `symmetricPlaintext` under `symmetricKey`.
-    static let symmetricKey = try! SymmetricCryptoKey(encodedKey: Data(0 ..< 64))
-    static let symmetricPlaintext = "quick access test vector"
-    static let symmetricInitializationVector = Data(200 ..< 216)
-    static let symmetricCiphertext = decodeBase64("+oA38hdXwQKDEaYk3+m8AE3OqkhMXrVyw0VjSM5D+gw=")
-    static let symmetricAuthenticationCode = decodeBase64("buPAfTjNC2+Ggbu2HUs2hrv8ajsIOFfBn1qbIzqzF6E=")
+    public static let symmetricKey = try! SymmetricCryptoKey(encodedKey: Data(0 ..< 64))
+    public static let symmetricPlaintext = "quick access test vector"
+    public static let symmetricInitializationVector = Data(200 ..< 216)
+    public static let symmetricCiphertext = decodeBase64("+oA38hdXwQKDEaYk3+m8AE3OqkhMXrVyw0VjSM5D+gw=")
+    public static let symmetricAuthenticationCode = decodeBase64("buPAfTjNC2+Ggbu2HUs2hrv8ajsIOFfBn1qbIzqzF6E=")
 
-    static let userKey = try! SymmetricCryptoKey(encodedKey: Data(repeating: 7, count: 64))
+    public static let userKey = try! SymmetricCryptoKey(encodedKey: Data(repeating: 7, count: 64))
 
-    static func decodeBase64(_ text: String) -> Data {
+    public static func decodeBase64(_ text: String) -> Data {
         Data(base64Encoded: text, options: .ignoreUnknownCharacters)!
     }
 
     /// Encrypts like Bitwarden does for a type 2 value, with a random initialization vector.
-    static func encrypt(_ text: String, with key: SymmetricCryptoKey) -> String {
+    public static func encrypt(_ text: String, with key: SymmetricCryptoKey) -> String {
         encrypt(Data(text.utf8), with: key)
     }
 
-    static func encrypt(_ plaintext: Data, with key: SymmetricCryptoKey) -> String {
+    public static func encrypt(_ plaintext: Data, with key: SymmetricCryptoKey) -> String {
         let initializationVector = try! RandomBytes.generate(count: SymmetricCipher.initializationVectorByteCount)
         return try! SymmetricCipher.encrypt(plaintext, with: key, initializationVector: initializationVector).serialized
     }
 
     /// RSA-OAEP-SHA1 encryption for a SubjectPublicKeyInfo public key, the desktop app's side of
     /// the IPC handshake.
-    static func rsaEncrypt(_ plaintext: Data, subjectPublicKeyInfo: Data) throws -> Data {
-        var outerReader = DerEncoding.Reader(subjectPublicKeyInfo)
-        var publicKeyInfoReader = DerEncoding.Reader(try outerReader.readElement(expecting: .sequence))
-        _ = try publicKeyInfoReader.readElement(expecting: .sequence)
-        // The first byte of a BIT STRING counts its unused bits; the PKCS#1 key follows.
-        let pkcs1PublicKey = try publicKeyInfoReader.readElement(expecting: .bitString).dropFirst()
+    public static func rsaEncrypt(_ plaintext: Data, subjectPublicKeyInfo: Data) throws -> Data {
+        // The Security framework imports the bare PKCS#1 key. For a 2048 bit RSA key that is
+        // everything after the 24 byte SubjectPublicKeyInfo header.
+        let subjectPublicKeyInfoHeaderByteCount = 24
+        let pkcs1PublicKey = subjectPublicKeyInfo.dropFirst(subjectPublicKeyInfoHeaderByteCount)
         let attributes: [CFString: Any] = [
             kSecAttrKeyType: kSecAttrKeyTypeRSA,
             kSecAttrKeyClass: kSecAttrKeyClassPublic,

@@ -1,5 +1,6 @@
 import Foundation
 @testable import QuickAccessCore
+import QuickAccessTestSupport
 import XCTest
 
 /// Plays the Bitwarden desktop app's side of the browser integration protocol, with this

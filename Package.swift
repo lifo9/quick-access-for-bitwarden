@@ -13,9 +13,19 @@ let package = Package(
             name: "BitwardenQuickAccess",
             dependencies: ["QuickAccessCore"]
         ),
+        // Test vectors and builders shared by both test targets.
+        .target(
+            name: "QuickAccessTestSupport",
+            dependencies: ["QuickAccessCore"],
+            path: "Tests/TestSupport"
+        ),
         .testTarget(
             name: "QuickAccessCoreTests",
-            dependencies: ["QuickAccessCore"]
+            dependencies: ["QuickAccessCore", "QuickAccessTestSupport"]
+        ),
+        .testTarget(
+            name: "BitwardenQuickAccessTests",
+            dependencies: ["BitwardenQuickAccess", "QuickAccessCore", "QuickAccessTestSupport"]
         ),
     ]
 )

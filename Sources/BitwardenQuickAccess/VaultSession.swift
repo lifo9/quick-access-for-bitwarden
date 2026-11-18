@@ -24,20 +24,22 @@ final class VaultSession {
         isBiometricUnlockEnabled: false
     )
 
+    private let desktop: any DesktopAccess
     private var userKey: SymmetricCryptoKey?
     private var unlockedUserId: String?
     private var stateFileModificationDate: Date?
     private var lastUseDate = Date()
     private var periodicCheck: Timer?
 
-    init() {
+    init(desktop: any DesktopAccess) {
+        self.desktop = desktop
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.lockIfRequired(by: .systemWillSleep)
+                self?.handle(.systemWillSleep)
             }
         }
         DistributedNotificationCenter.default().addObserver(
@@ -46,7 +48,7 @@ final class VaultSession {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.lockIfRequired(by: .screenLocked)
+                self?.handle(.screenLocked)
             }
         }
         periodicCheck = Timer.scheduledTimer(withTimeInterval: Self.periodicCheckInterval, repeats: true) { [weak self] _ in
@@ -70,9 +72,9 @@ final class VaultSession {
         }
         state = .unlocking
         do {
-            let desktopState = try DesktopApp.loadState()
-            let stateFileModificationDate = try Self.readStateFileModificationDate()
-            let outcome = try await DesktopApp.makeBiometricsClient().requestUnlock(userId: desktopState.userId)
+            let desktopState = try desktop.loadState()
+            let stateFileModificationDate = try desktop.readStateModificationDate()
+            let outcome = try await desktop.requestUnlock(userId: desktopState.userId)
             switch outcome {
             case let .unlocked(userKey):
                 let vault = try VaultDecryptor.unlock(desktopState, userKey: userKey)
@@ -104,11 +106,11 @@ final class VaultSession {
             return
         }
         do {
-            let currentModificationDate = try Self.readStateFileModificationDate()
+            let currentModificationDate = try desktop.readStateModificationDate()
             guard currentModificationDate != stateFileModificationDate else {
                 return
             }
-            let desktopState = try DesktopApp.loadState()
+            let desktopState = try desktop.loadState()
             // A different account in the desktop app means this key is for the wrong vault.
             guard desktopState.userId == unlockedUserId else {
                 lock()
@@ -127,21 +129,18 @@ final class VaultSession {
         // Any kind of input counts as activity, as it does for the desktop app's idle check.
         let anyInputEventType = CGEventType(rawValue: UInt32.max)!
         let systemIdleSeconds = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInputEventType)
-        lockIfRequired(by: .periodicCheck(
+        handle(.periodicCheck(
             systemIdleSeconds: systemIdleSeconds,
             secondsSinceLastUse: Date().timeIntervalSince(lastUseDate)
         ))
     }
 
-    private func lockIfRequired(by event: LockEvent) {
+    /// Locks the vault if the desktop app's vault timeout setting asks for it on this event.
+    func handle(_ event: LockEvent) {
         guard isUnlocked, LockPolicy.shouldLock(vaultTimeout: settings.vaultTimeout, on: event) else {
             return
         }
         lock()
-    }
-
-    private static func readStateFileModificationDate() throws -> Date? {
-        try DesktopApp.locateStateFile().resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
     }
 
     private static func explain(_ status: BiometricsStatus) -> String {
@@ -160,9 +159,9 @@ final class VaultSession {
 
     private static func explain(_ error: Error) -> String {
         switch error {
-        case DesktopApp.LocationError.desktopAppNotInstalled:
+        case InstalledDesktopApp.LocationError.desktopAppNotInstalled:
             "The Bitwarden desktop app is not installed."
-        case DesktopApp.LocationError.stateFileNotFound, DesktopStateError.noActiveAccount:
+        case InstalledDesktopApp.LocationError.stateFileNotFound, DesktopStateError.noActiveAccount:
             "No account is logged in to the Bitwarden desktop app."
         case DesktopStateError.unsupportedAccountEncryption:
             "This account uses a newer encryption format that is not supported yet."

@@ -27,7 +27,8 @@ final class QuickAccessModel {
 
     let session: VaultSession
     private let clipboard: ClipboardWriter
-    private let usageStore = UsageStore()
+    private let usageStore: UsageStore
+    private let openInBrowser: (URL) -> Void
 
     private(set) var query = ""
     private(set) var matchingItems = [VaultItem]()
@@ -43,9 +44,16 @@ final class QuickAccessModel {
     /// Closes the panel; set by the panel controller.
     var dismissPanel: () -> Void = {}
 
-    init(session: VaultSession, clipboard: ClipboardWriter) {
+    init(
+        session: VaultSession,
+        clipboard: ClipboardWriter,
+        usageStore: UsageStore,
+        openInBrowser: @escaping (URL) -> Void
+    ) {
         self.session = session
         self.clipboard = clipboard
+        self.usageStore = usageStore
+        self.openInBrowser = openInBrowser
     }
 
     var selectedItem: VaultItem? {
@@ -219,7 +227,7 @@ final class QuickAccessModel {
                     notice = "This website address cannot be opened in a browser."
                     return
                 }
-                NSWorkspace.shared.open(websiteUrl)
+                openInBrowser(websiteUrl)
             }
             usageStore.recordUse(ofItemWithId: item.id)
             session.noteUse()

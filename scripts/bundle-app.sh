@@ -9,7 +9,7 @@ repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 app_bundle="$repo_root/build/Bitwarden Quick Access.app"
 executable_name="BitwardenQuickAccess"
 
-swift build --package-path "$repo_root" --configuration release
+swift build --package-path "$repo_root" --configuration release --product "$executable_name"
 binaries_directory="$(swift build --package-path "$repo_root" --configuration release --show-bin-path)"
 
 rm -rf "$app_bundle"

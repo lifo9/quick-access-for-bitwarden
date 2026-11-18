@@ -1,5 +1,6 @@
 import Foundation
 @testable import QuickAccessCore
+import QuickAccessTestSupport
 import XCTest
 
 final class CryptoTests: XCTestCase {
