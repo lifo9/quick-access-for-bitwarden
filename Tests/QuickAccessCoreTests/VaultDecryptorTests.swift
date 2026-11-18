@@ -165,6 +165,22 @@ final class VaultDecryptorTests: XCTestCase {
         XCTAssertEqual(vault.numUndecryptableItems, 3)
     }
 
+    func test_unlock__readsPersonalItemsWhenThePrivateKeyCannotBeImported() throws {
+        // The RSA key is only needed for organization keys; an account must not become
+        // unreadable over a key format that its own items never use.
+        let unreadablePrivateKey = ["V1": ["private_key": Fixtures.encrypt("not a key", with: Fixtures.userKey)]]
+        let organizationItem = makeLogin(id: "shared", extra: ["organizationId": organizationId])
+        let stateFile = try makeStateFile(
+            ciphers: [makeLogin(id: "personal"), organizationItem],
+            settings: [StateFileBuilder.settingKey("crypto_accountCryptographicState"): unreadablePrivateKey]
+        )
+
+        let vault = try VaultDecryptor.unlock(DesktopState(stateFileContents: stateFile), userKey: Fixtures.userKey)
+
+        XCTAssertEqual(vault.items.map(\.id), ["personal"])
+        XCTAssertEqual(vault.numUndecryptableItems, 1)
+    }
+
     func test_unlock__throwsWhenUserKeyBelongsToAnotherAccount() throws {
         let state = try DesktopState(stateFileContents: makeStateFile(ciphers: [makeLogin()]))
 

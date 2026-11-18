@@ -7,9 +7,14 @@ import Foundation
 /// key or by its organization's key.
 public enum VaultDecryptor {
     public static func unlock(_ state: DesktopState, userKey: SymmetricCryptoKey) throws -> UnlockedVault {
-        let privateKey = try decryptPrivateKey(state.encryptedPrivateKey, userKey: userKey)
+        let pkcs8PrivateKey = try decryptPrivateKey(state.encryptedPrivateKey, userKey: userKey)
+        // The RSA key is imported only to unwrap organization keys. Without it the items of
+        // organizations count as undecryptable; the account's own items do not depend on it.
+        let privateKey = try? RsaCipher.makePrivateKey(pkcs8DerEncoded: pkcs8PrivateKey)
         let organizationKeysByOrganizationId = state.organizationKeysByOrganizationId
-            .compactMapValues { try? unwrapOrganizationKey($0, privateKey: privateKey) }
+            .compactMapValues { organizationKey in
+                privateKey.flatMap { try? unwrapOrganizationKey(organizationKey, privateKey: $0) }
+            }
 
         let visibleCiphers = state.ciphers.filter { $0.deletedDate == nil && $0.archivedDate == nil }
         let items = visibleCiphers.compactMap { cipher in
@@ -22,13 +27,13 @@ public enum VaultDecryptor {
         return UnlockedVault(items: items, numUndecryptableItems: visibleCiphers.count - items.count)
     }
 
+    /// - Returns: The account's RSA private key in PKCS#8 form.
     private static func decryptPrivateKey(
         _ encryptedPrivateKey: String,
         userKey: SymmetricCryptoKey
-    ) throws -> RsaPrivateKey {
-        let pkcs8PrivateKey: Data
+    ) throws -> Data {
         do {
-            pkcs8PrivateKey = try SymmetricCipher.decrypt(
+            return try SymmetricCipher.decrypt(
                 EncryptedString(serialized: encryptedPrivateKey),
                 with: userKey
             )
@@ -37,7 +42,6 @@ public enum VaultDecryptor {
             // the key handed over by the desktop app belongs to the account in the state file.
             throw VaultError.userKeyDoesNotMatchAccount
         }
-        return try RsaCipher.makePrivateKey(pkcs8DerEncoded: pkcs8PrivateKey)
     }
 
     private static func unwrapOrganizationKey(
