@@ -99,7 +99,7 @@ public enum VaultDecryptor {
             throw VaultError.unsupportedItemType(cipher.type)
         }
 
-        let noteField = try builder.makeField(id: "notes", label: "Notes", role: .note, cipher.notes)
+        let noteField = try builder.makeField(id: "notes", name: .standard(.notes), role: .note, cipher.notes)
         let fields =
             kindFields + [noteField].compactMap { $0 }
             + (try makeCustomFields(
@@ -153,16 +153,17 @@ public enum VaultDecryptor {
             canViewPassword
             ? [
                 try builder.makeField(
-                    id: "login.password", label: "Password", role: .password, isConcealed: true, login.password),
+                    id: "login.password", name: .standard(.password), role: .password, isConcealed: true, login.password
+                ),
                 try builder.makeField(
-                    id: "login.totp", label: "One-time code", role: .oneTimeCode, isConcealed: true, login.totp),
+                    id: "login.totp", name: .standard(.oneTimeCode), role: .oneTimeCode, isConcealed: true, login.totp),
             ]
             : []
         let websiteFields = try (login.uris ?? []).enumerated().map { uriIndex, loginUri in
-            try builder.makeField(id: "login.uri.\(uriIndex)", label: "Website", role: .website, loginUri.uri)
+            try builder.makeField(id: "login.uri.\(uriIndex)", name: .standard(.website), role: .website, loginUri.uri)
         }
         let usernameField = try builder.makeField(
-            id: "login.username", label: "Username", role: .username, login.username)
+            id: "login.username", name: .standard(.username), role: .username, login.username)
         return ([usernameField] + secretFields + websiteFields).compactMap { $0 }
     }
 
@@ -171,34 +172,35 @@ public enum VaultDecryptor {
             return []
         }
         return try [
-            builder.makeField(id: "card.number", label: "Number", role: .cardNumber, isConcealed: true, card.number),
-            builder.makeField(id: "card.code", label: "Security code", isConcealed: true, card.code),
-            builder.makeField(id: "card.cardholderName", label: "Cardholder name", card.cardholderName),
-            builder.makeField(id: "card.expMonth", label: "Expiration month", card.expMonth),
-            builder.makeField(id: "card.expYear", label: "Expiration year", card.expYear),
-            builder.makeField(id: "card.brand", label: "Brand", card.brand),
+            builder.makeField(
+                id: "card.number", name: .standard(.cardNumber), role: .cardNumber, isConcealed: true, card.number),
+            builder.makeField(id: "card.code", name: .standard(.cardSecurityCode), isConcealed: true, card.code),
+            builder.makeField(id: "card.cardholderName", name: .standard(.cardholderName), card.cardholderName),
+            builder.makeField(id: "card.expMonth", name: .standard(.cardExpirationMonth), card.expMonth),
+            builder.makeField(id: "card.expYear", name: .standard(.cardExpirationYear), card.expYear),
+            builder.makeField(id: "card.brand", name: .standard(.cardBrand), card.brand),
         ].compactMap { $0 }
     }
 
-    private static let identityProperties: [(propertyName: String, label: String, isConcealed: Bool)] = [
-        ("email", "Email", false),
-        ("username", "Username", false),
-        ("phone", "Phone", false),
-        ("title", "Title", false),
-        ("firstName", "First name", false),
-        ("middleName", "Middle name", false),
-        ("lastName", "Last name", false),
-        ("company", "Company", false),
-        ("address1", "Address 1", false),
-        ("address2", "Address 2", false),
-        ("address3", "Address 3", false),
-        ("city", "City", false),
-        ("state", "State", false),
-        ("postalCode", "Postal code", false),
-        ("country", "Country", false),
-        ("ssn", "Social security number", true),
-        ("passportNumber", "Passport number", true),
-        ("licenseNumber", "License number", true),
+    private static let identityProperties: [(propertyName: String, name: VaultFieldName, isConcealed: Bool)] = [
+        ("email", .standard(.identityEmail), false),
+        ("username", .standard(.identityUsername), false),
+        ("phone", .standard(.identityPhone), false),
+        ("title", .standard(.identityTitle), false),
+        ("firstName", .standard(.identityFirstName), false),
+        ("middleName", .standard(.identityMiddleName), false),
+        ("lastName", .standard(.identityLastName), false),
+        ("company", .standard(.identityCompany), false),
+        ("address1", .standard(.identityAddress1), false),
+        ("address2", .standard(.identityAddress2), false),
+        ("address3", .standard(.identityAddress3), false),
+        ("city", .standard(.identityCity), false),
+        ("state", .standard(.identityState), false),
+        ("postalCode", .standard(.identityPostalCode), false),
+        ("country", .standard(.identityCountry), false),
+        ("ssn", .standard(.identitySocialSecurityNumber), true),
+        ("passportNumber", .standard(.identityPassportNumber), true),
+        ("licenseNumber", .standard(.identityLicenseNumber), true),
     ]
 
     private static func makeIdentityFields(
@@ -208,7 +210,7 @@ public enum VaultDecryptor {
         try identityProperties.compactMap { property in
             try builder.makeField(
                 id: "identity.\(property.propertyName)",
-                label: property.label,
+                name: property.name,
                 isConcealed: property.isConcealed,
                 identity[property.propertyName] ?? nil
             )
@@ -220,9 +222,10 @@ public enum VaultDecryptor {
             return []
         }
         return try [
-            builder.makeField(id: "sshKey.publicKey", label: "Public key", sshKey.publicKey),
-            builder.makeField(id: "sshKey.keyFingerprint", label: "Fingerprint", sshKey.keyFingerprint),
-            builder.makeField(id: "sshKey.privateKey", label: "Private key", isConcealed: true, sshKey.privateKey),
+            builder.makeField(id: "sshKey.publicKey", name: .standard(.sshPublicKey), sshKey.publicKey),
+            builder.makeField(id: "sshKey.keyFingerprint", name: .standard(.sshKeyFingerprint), sshKey.keyFingerprint),
+            builder.makeField(
+                id: "sshKey.privateKey", name: .standard(.sshPrivateKey), isConcealed: true, sshKey.privateKey),
         ].compactMap { $0 }
     }
 
@@ -244,7 +247,7 @@ public enum VaultDecryptor {
             // Linked fields have no value of their own and are skipped by `makeField`.
             return try builder.makeField(
                 id: "field.\(fieldIndex)",
-                label: fieldName.isEmpty ? "Field \(fieldIndex + 1)" : fieldName,
+                name: fieldName.isEmpty ? .unnamedCustom(fieldIndex + 1) : .custom(fieldName),
                 isConcealed: isHidden,
                 customField.value
             )
@@ -258,7 +261,7 @@ private struct FieldBuilder {
 
     func makeField(
         id: String,
-        label: String,
+        name: VaultFieldName,
         role: VaultFieldRole = .other,
         isConcealed: Bool = false,
         _ serializedValue: String?
@@ -268,7 +271,7 @@ private struct FieldBuilder {
         }
         return VaultField(
             id: id,
-            label: label,
+            name: name,
             role: role,
             isConcealed: isConcealed,
             encryptedValue: try EncryptedString(serialized: serializedValue),

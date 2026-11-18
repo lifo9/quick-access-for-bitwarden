@@ -23,6 +23,7 @@ A flat JSON object. Keys are `global_<group>_<name>` and `user_<user id>_<group>
 | `user_<id>_autofillSettingsLocal_clearClipboardDelay` | `never`, `tenSeconds`, … `fiveMinutes`                  |
 | `user_<id>_biometricSettings_biometricUnlockEnabled`  | Whether Touch ID unlock is on                           |
 | `global_domainSettings_showFavicons`              | "Show website icons"; on when absent                        |
+| `global_translation_locale`                       | The desktop app's language, such as `sk`; absent when it follows the system |
 | `user_<id>_environment_environment`               | `{"region", "urls": {"base", "icons", "webVault", …}}`, the account's server |
 
 Values that are absent take the desktop app's defaults, which upstream defines in:

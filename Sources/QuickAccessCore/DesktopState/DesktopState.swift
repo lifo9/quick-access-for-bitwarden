@@ -153,6 +153,10 @@ private struct StateFile: Decodable {
         let websiteIconServerUrl =
             showsWebsiteIcons ? WebsiteIcon.resolveIconServerUrl(environment: accountEnvironment) : nil
 
+        // The language is an extra as well: one that cannot be read means the system's.
+        let desktopLocale =
+            (try? container.decodeIfPresent(String.self, forKey: StateKey("global_translation_locale"))) ?? nil
+
         desktopState = DesktopState(
             userId: userId,
             encryptedPrivateKey: classicKeys.privateKey,
@@ -163,7 +167,8 @@ private struct StateFile: Decodable {
                 clipboardClearDelay: storedClipboardClearDelay.map(ClipboardClearDelay.init(storedText:))
                     ?? ClipboardClearDelay.desktopDefault,
                 isBiometricUnlockEnabled: isBiometricUnlockEnabled,
-                websiteIconServerUrl: websiteIconServerUrl
+                websiteIconServerUrl: websiteIconServerUrl,
+                desktopLocale: desktopLocale
             )
         )
     }

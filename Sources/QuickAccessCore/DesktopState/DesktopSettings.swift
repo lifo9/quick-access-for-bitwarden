@@ -65,16 +65,21 @@ public struct DesktopSettings: Sendable, Equatable {
     /// The service website icons are fetched from; `nil` when "Show website icons" is switched
     /// off in the desktop app or the account's server is not known.
     public let websiteIconServerUrl: URL?
+    /// The language the desktop app is set to, such as `sk` or `en-GB`; `nil` when it follows
+    /// the system's language.
+    public let desktopLocale: String?
 
     public init(
         vaultTimeout: VaultTimeout,
         clipboardClearDelay: ClipboardClearDelay,
         isBiometricUnlockEnabled: Bool,
-        websiteIconServerUrl: URL? = nil
+        websiteIconServerUrl: URL? = nil,
+        desktopLocale: String? = nil
     ) {
         self.vaultTimeout = vaultTimeout
         self.clipboardClearDelay = clipboardClearDelay
         self.isBiometricUnlockEnabled = isBiometricUnlockEnabled
         self.websiteIconServerUrl = websiteIconServerUrl
+        self.desktopLocale = desktopLocale
     }
 }

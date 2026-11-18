@@ -10,6 +10,8 @@
 	<string>dev.filo.quick-access-for-bitwarden</string>
 	<key>CFBundleExecutable</key>
 	<string>QuickAccessForBitwarden</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

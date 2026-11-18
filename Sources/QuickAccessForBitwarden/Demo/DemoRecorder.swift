@@ -82,7 +82,9 @@ enum DemoRecorder {
             iconStore: WebsiteIconStore(fetchIconData: DemoIcons.makeIconData),
             clipboard: ClipboardWriter(pasteboard: pasteboard),
             usageStore: UsageStore(defaults: UserDefaults(suiteName: demoDefaultsSuiteName) ?? .standard),
-            openInBrowser: { _ in }
+            openInBrowser: { _ in },
+            // The screencast is in English whatever the language of the Mac that records it.
+            preferredSystemLanguages: ["en"]
         )
         model.dismissPanel = { stage.isPanelVisible = false }
 

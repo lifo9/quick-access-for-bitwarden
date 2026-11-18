@@ -85,8 +85,11 @@ final class VaultDecryptorTests: XCTestCase {
         XCTAssertEqual(item.subtitle, "Visa")
         XCTAssertEqual(try item.revealValue(of: XCTUnwrap(item.defaultField)), "4111111111111111")
         XCTAssertEqual(
-            item.fields.map(\.label),
-            ["Number", "Security code", "Cardholder name", "Expiration month", "Expiration year", "Brand"])
+            item.fields.map(\.name),
+            [
+                .standard(.cardNumber), .standard(.cardSecurityCode), .standard(.cardholderName),
+                .standard(.cardExpirationMonth), .standard(.cardExpirationYear), .standard(.cardBrand),
+            ])
     }
 
     func test_unlock__decryptsSecureNoteAndCustomFields() throws {
@@ -116,9 +119,25 @@ final class VaultDecryptorTests: XCTestCase {
 
         XCTAssertEqual(item.kind, .secureNote)
         XCTAssertEqual(try item.revealValue(of: XCTUnwrap(item.defaultField)), "guest network")
-        XCTAssertEqual(item.fields.map(\.label), ["Notes", "SSID", "Key"])
+        XCTAssertEqual(item.fields.map(\.name), [.standard(.notes), .custom("SSID"), .custom("Key")])
         XCTAssertEqual(item.fields.map(\.isConcealed), [false, false, true])
         XCTAssertEqual(try item.revealValue(of: item.fields[2]), "hunter2")
+    }
+
+    func test_unlock__numbersCustomFieldsThatHaveNoName() throws {
+        let login = makeLogin(extra: [
+            "fields": [
+                [
+                    "name": Fixtures.encrypt("PIN", with: Fixtures.userKey),
+                    "value": Fixtures.encrypt("1234", with: Fixtures.userKey), "type": 1,
+                ],
+                ["name": NSNull(), "value": Fixtures.encrypt("spare", with: Fixtures.userKey), "type": 0],
+            ]
+        ])
+
+        let item = try XCTUnwrap(unlock(ciphers: [login]).items.first)
+
+        XCTAssertEqual(item.fields.suffix(2).map(\.name), [.custom("PIN"), .unnamedCustom(2)])
     }
 
     func test_unlock__decryptsIdentityWithNameAsSubtitle() throws {
@@ -138,7 +157,12 @@ final class VaultDecryptorTests: XCTestCase {
         let item = try XCTUnwrap(unlock(ciphers: [identity]).items.first)
 
         XCTAssertEqual(item.subtitle, "Alice Example")
-        XCTAssertEqual(item.fields.map(\.label), ["Email", "First name", "Last name", "Social security number"])
+        XCTAssertEqual(
+            item.fields.map(\.name),
+            [
+                .standard(.identityEmail), .standard(.identityFirstName), .standard(.identityLastName),
+                .standard(.identitySocialSecurityNumber),
+            ])
         XCTAssertEqual(item.fields.last?.isConcealed, true)
     }
 
@@ -221,13 +245,16 @@ final class VaultDecryptorTests: XCTestCase {
         ])
         let item = try XCTUnwrap(unlock(ciphers: [protectedLogin]).items.first)
 
-        let releasedLabels = item.fields.filter { (try? item.revealValue(of: $0)) != nil }.map(\.label)
+        let releasedNames = item.fields.filter { (try? item.revealValue(of: $0)) != nil }.map(\.name)
 
         XCTAssertEqual(
-            item.fields.map(\.label),
-            ["Username", "Password", "One-time code", "Website", "Notes", "Account number"]
+            item.fields.map(\.name),
+            [
+                .standard(.username), .standard(.password), .standard(.oneTimeCode), .standard(.website),
+                .standard(.notes), .custom("Account number"),
+            ]
         )
-        XCTAssertEqual(releasedLabels, ["Username", "Website"])
+        XCTAssertEqual(releasedNames, [.standard(.username), .standard(.website)])
     }
 
     func test_revealValue__refusesTheNoteOfSecureNoteWithMasterPasswordReprompt() throws {
@@ -264,7 +291,7 @@ final class VaultDecryptorTests: XCTestCase {
 
         let item = try XCTUnwrap(unlock(ciphers: [sharedLogin]).items.first)
 
-        XCTAssertEqual(item.fields.map(\.label), ["Username", "Website", "Hint"])
+        XCTAssertEqual(item.fields.map(\.name), [.standard(.username), .standard(.website), .custom("Hint")])
     }
 
     // MARK: - Reading the state file
@@ -288,6 +315,15 @@ final class VaultDecryptorTests: XCTestCase {
                 clipboardClearDelay: .seconds(30),
                 isBiometricUnlockEnabled: true
             ))
+    }
+
+    func test_DesktopState_init__readsTheLanguageTheDesktopAppIsSetTo() throws {
+        let stateWithLanguage = try DesktopState(
+            stateFileContents: makeStateFile(ciphers: [], settings: ["global_translation_locale": "sk"]))
+        let stateFollowingTheSystem = try DesktopState(stateFileContents: makeStateFile(ciphers: []))
+
+        XCTAssertEqual(stateWithLanguage.settings.desktopLocale, "sk")
+        XCTAssertNil(stateFollowingTheSystem.settings.desktopLocale)
     }
 
     func test_DesktopState_init__readsVaultTimeoutGivenInMinutes() throws {

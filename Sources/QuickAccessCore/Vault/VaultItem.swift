@@ -19,12 +19,57 @@ public enum VaultFieldRole: Sendable, Equatable {
     case other
 }
 
+/// What a field defined by Bitwarden holds, for the app to name it in the user's language.
+public enum StandardFieldName: Hashable, Sendable, CaseIterable {
+    case username
+    case password
+    case oneTimeCode
+    case website
+    case notes
+    case cardNumber
+    case cardSecurityCode
+    case cardholderName
+    case cardExpirationMonth
+    case cardExpirationYear
+    case cardBrand
+    case identityEmail
+    case identityUsername
+    case identityPhone
+    case identityTitle
+    case identityFirstName
+    case identityMiddleName
+    case identityLastName
+    case identityCompany
+    case identityAddress1
+    case identityAddress2
+    case identityAddress3
+    case identityCity
+    case identityState
+    case identityPostalCode
+    case identityCountry
+    case identitySocialSecurityNumber
+    case identityPassportNumber
+    case identityLicenseNumber
+    case sshPublicKey
+    case sshKeyFingerprint
+    case sshPrivateKey
+}
+
+/// The name of a field: one of Bitwarden's, or the user's own for a custom field.
+public enum VaultFieldName: Hashable, Sendable {
+    case standard(StandardFieldName)
+    /// A custom field, with the name the user gave it.
+    case custom(String)
+    /// A custom field without a name; the number is its place among the item's custom fields.
+    case unnamedCustom(Int)
+}
+
 /// One copyable value of an item. The value itself stays encrypted until `VaultItem.revealValue`
 /// is called, so that secrets are only in memory in the clear while they are being used.
 public struct VaultField: Identifiable, Sendable, Equatable {
     /// Unique within its item.
     public let id: String
-    public let label: String
+    public let name: VaultFieldName
     public let role: VaultFieldRole
     /// Whether the desktop app hides this value behind a "reveal" toggle.
     public let isConcealed: Bool
