@@ -5,7 +5,7 @@ vault and copy usernames, passwords, one-time codes and other fields, without sw
 Bitwarden app.
 
 It is a companion to the official Bitwarden desktop app, not a Bitwarden client of its own. It is
-not affiliated with Bitwarden.
+an independent project, not affiliated with, endorsed by or sponsored by Bitwarden, Inc.
 
 ## How it works
 
@@ -37,6 +37,8 @@ what the panel shows.
 - An account with Bitwarden's classic encryption (see Limitations).
 
 ## Build and install
+
+There are no prebuilt downloads; the app is built from source on the Mac that runs it.
 
 ```sh
 just install    # builds, copies the app to /Applications and starts it
@@ -92,4 +94,12 @@ that shortcut off under System Settings → Keyboard → Keyboard Shortcuts.
 
 ## Development
 
-`just check` builds everything and runs the tests. See [AGENTS.md](AGENTS.md) for the layout.
+`just check` checks the format, builds everything and runs the tests; CI runs the same commands
+on every push and pull request. See [AGENTS.md](AGENTS.md) for the layout and the rules.
+
+## License
+
+[MIT](LICENSE.md).
+
+Bitwarden is a trademark of Bitwarden, Inc. It is used here only to name the software this
+project works with.
