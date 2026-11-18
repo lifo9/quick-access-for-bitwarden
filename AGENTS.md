@@ -20,7 +20,9 @@ toolchain. A command added to `just check` has to be added to the workflow as we
 
 - `Sources/QuickAccessCore`: everything without UI, with no AppKit: crypto, reading the desktop
   state file, vault decryption, one-time codes, search ranking, lock policy, the IPC client.
-- `Sources/QuickAccessForBitwarden`: the app: hot key, panel, model, session, clipboard.
+- `Sources/QuickAccessForBitwarden`: the app: hot key, panel, model, session, clipboard, icons.
+  `Demo/` holds an invented vault (`--demo`, `just demo`) and the recorder of the README's
+  screencast (`just screencast`); rerun the recorder after a change to the panel's look.
 - `Tests/TestSupport`: test vectors and the state file builder, shared by both test targets.
 
 ## Rules

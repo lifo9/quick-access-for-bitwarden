@@ -4,6 +4,11 @@ A macOS menu bar app that opens a Spotlight-style panel on a global shortcut to 
 vault and copy usernames, passwords, one-time codes and other fields, without switching to the
 Bitwarden app.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screencast-dark.gif">
+  <img src="docs/screencast-light.gif" width="696" alt="The panel opens, a search narrows the list, and a one-time code is copied from an item's actions">
+</picture>
+
 It is a companion to the official Bitwarden desktop app, not a Bitwarden client of its own. It is
 an independent project, not affiliated with, endorsed by or sponsored by Bitwarden, Inc.
 
@@ -70,6 +75,10 @@ Without `just`: `scripts/bundle-app.sh` builds `build/Quick Access for Bitwarden
 Before anything is typed, the list suggests items named after the app in front, then the items
 used most often, then favorites.
 
+Drag the panel by any empty part of it to move it, and by its edges to resize it; it comes back
+where and how it was left. It is an ordinary window, so window managers can place it too. It
+follows the light or dark appearance of the Mac.
+
 On macOS versions where the system uses ⇧⌘Space itself ("Ask Siri about active window"), switch
 that shortcut off under System Settings → Keyboard → Keyboard Shortcuts.
 
@@ -100,7 +109,8 @@ that shortcut off under System Settings → Keyboard → Keyboard Shortcuts.
 ## Development
 
 `just check` checks the format, builds everything and runs the tests; CI runs the same commands
-on every push and pull request. See [AGENTS.md](AGENTS.md) for the layout and the rules.
+on every push and pull request. `just demo` runs the app against an invented vault, without the
+Bitwarden desktop app or Touch ID, and `just screencast` records the animation above from it. See [AGENTS.md](AGENTS.md) for the layout and the rules.
 
 ## License
 

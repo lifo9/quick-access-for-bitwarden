@@ -25,6 +25,15 @@ install: bundle
     cp -R "build/Quick Access for Bitwarden.app" "$installed_app"
     open "$installed_app"
 
+# Run the app against an invented vault instead of the Bitwarden desktop app: no Touch ID, no
+# real data.
+demo:
+    swift run QuickAccessForBitwarden --demo
+
+# Regenerate the screencast of the README from the demo vault, in both appearances.
+screencast:
+    swift run QuickAccessForBitwarden --record-demo docs/screencast
+
 # Check every dependency on the Bitwarden desktop app; add "--unlock" to also request Touch ID
 # and decrypt the vault. Prints counts and settings, never secrets.
 diagnose *arguments:

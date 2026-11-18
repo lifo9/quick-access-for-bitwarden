@@ -3,7 +3,8 @@ import ServiceManagement
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
-    private let session = VaultSession(desktop: InstalledDesktopApp())
+    private let environment: AppEnvironment
+    private let session: VaultSession
     private let clipboard = ClipboardWriter()
     private var panelController: QuickAccessPanelController?
     private var hotKey: GlobalHotKey?
@@ -15,13 +16,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         keyEquivalent: ""
     )
 
+    init(environment: AppEnvironment) {
+        self.environment = environment
+        session = VaultSession(desktop: environment.desktop)
+        super.init()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         let panelController = QuickAccessPanelController(
             model: QuickAccessModel(
                 session: session,
-                iconStore: WebsiteIconStore(),
+                iconStore: environment.iconStore,
                 clipboard: clipboard,
-                usageStore: UsageStore(),
+                usageStore: UsageStore(defaults: environment.usageDefaults),
                 openInBrowser: { NSWorkspace.shared.open($0) }
             )
         )
