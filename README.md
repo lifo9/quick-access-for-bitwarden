@@ -6,7 +6,7 @@ Bitwarden app.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screencast-dark.gif">
-  <img src="docs/screencast-light.gif" width="696" alt="The panel opens, a search narrows the list, and a one-time code is copied from an item's actions">
+  <img src="docs/screencast-light.gif" width="696" alt="The panel opens on a locked vault, which Touch ID unlocks; a search narrows the list and a one-time code is copied from an item's actions; an item with master password re-prompt is refused; the panel is shown resized, then in Slovak and in Czech">
 </picture>
 
 It is a companion to the official Bitwarden desktop app, not a Bitwarden client of its own. It is
