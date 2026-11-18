@@ -29,8 +29,12 @@ private final class FakeDesktop: DesktopAccess {
         stateModificationDate
     }
 
+    /// Runs while the Touch ID prompt is up, to play what happens meanwhile.
+    var whileWaitingForTouchId: () -> Void = {}
+
     func requestUnlock(userId: String) async throws -> BiometricUnlockOutcome {
         numUnlockRequests += 1
+        whileWaitingForTouchId()
         return unlockOutcome
     }
 }
@@ -739,6 +743,24 @@ final class QuickAccessModelTests: XCTestCase {
 
         XCTAssertEqual(harness.matchingItemNames, ["New login"])
         XCTAssertEqual(harness.desktop.numUnlockRequests, 1)
+    }
+
+    func test_prepareForShowing__picksUpASyncThatHappenedDuringTheTouchIdPrompt() async throws {
+        let harness = try makeHarness()
+        let stateFileAfterSync = try StateFileBuilder.makeStateFile(ciphers: [
+            StateFileBuilder.makeLogin(id: "new", name: "Synced during the prompt")
+        ])
+        harness.desktop.whileWaitingForTouchId = { [desktop = harness.desktop, session = harness.session] in
+            desktop.stateFile = stateFileAfterSync
+            desktop.stateModificationDate = Date(timeIntervalSince1970: 2_000)
+            // The menu of the menu bar icon is opened while the prompt is up.
+            session.reloadIfDesktopStateChanged()
+        }
+
+        await harness.model.unlock()
+        harness.model.prepareForShowing(frontmostAppName: nil)
+
+        XCTAssertEqual(harness.matchingItemNames, ["Synced during the prompt"])
     }
 
     func test_prepareForShowing__locksWhenTheDesktopAppSwitchedToAnotherAccount() async throws {

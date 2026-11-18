@@ -47,6 +47,12 @@ MATCH_APP_IDENTIFIER=dev.filo.quick-access-for-bitwarden \
 `match` asks for the Apple ID and for the passphrase of the repository. The app uses no capability
 that needs a provisioning profile, so none is created.
 
+Run it through `bundle exec`, which uses the fastlane version the lock file pins. Signing in with
+an Apple ID needs fastlane 2.240.0 or later: Apple removed the endpoint older versions use for
+it, and they fail with "Service key is empty". Without a Ruby at hand:
+`BUNDLE_PATH=vendor/bundle nix shell nixpkgs#ruby -c sh -c 'bundle install && bundle exec fastlane match'`,
+with the variables above.
+
 **The secrets** belong to the `release` environment of the repository (Settings → Environments),
 which only jobs running from `main` can use:
 

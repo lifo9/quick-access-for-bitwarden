@@ -17,6 +17,11 @@ final class AppStringsTests: XCTestCase {
         XCTAssertEqual(AppLanguage.resolve(desktopLocale: nil, preferredSystemLanguages: ["en-US", "sk-SK"]), .english)
     }
 
+    func test_resolve__followsTheSystemWhenTheDesktopAppsLanguageIsEmpty() {
+        XCTAssertEqual(AppLanguage.resolve(desktopLocale: "", preferredSystemLanguages: ["sk-SK"]), .slovak)
+        XCTAssertEqual(AppLanguage.resolve(desktopLocale: "-", preferredSystemLanguages: ["cs-CZ"]), .czech)
+    }
+
     func test_resolve__fallsBackToEnglishForLanguagesWithoutTexts() {
         XCTAssertEqual(AppLanguage.resolve(desktopLocale: "de", preferredSystemLanguages: ["sk-SK"]), .english)
         XCTAssertEqual(AppLanguage.resolve(desktopLocale: nil, preferredSystemLanguages: ["fr-FR"]), .english)
@@ -27,9 +32,9 @@ final class AppStringsTests: XCTestCase {
         for language in AppLanguage.allCases {
             let strings = AppStrings.strings(for: language)
             XCTAssertEqual(
-                Set(strings.fieldNames.keys), Set(VaultFieldName.standardNames), "field names of \(language)")
-            for fieldName in VaultFieldName.standardNames {
-                XCTAssertFalse(strings.name(of: fieldName).isEmpty, "\(fieldName) in \(language)")
+                Set(strings.fieldNames.keys), Set(StandardFieldName.allCases), "field names of \(language)")
+            for standardName in StandardFieldName.allCases {
+                XCTAssertFalse(strings.name(of: .standard(standardName)).isEmpty, "\(standardName) in \(language)")
             }
         }
     }

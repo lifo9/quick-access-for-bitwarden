@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import ServiceManagement
 
 @MainActor
@@ -10,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var hotKey: GlobalHotKey?
     private var statusItem: NSStatusItem?
     private var isHotKeyTaken = false
+    private let remembersMenuBarIcon: Bool
 
     private let openMenuItem = NSMenuItem(title: "", action: #selector(openQuickAccess), keyEquivalent: " ")
     private let hotKeyTakenMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -20,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         title: "", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
     init(environment: AppEnvironment) {
+        remembersMenuBarIcon = environment.remembersMenuBarIcon
         session = VaultSession(desktop: environment.desktop)
         model = QuickAccessModel(
             session: session,
@@ -46,10 +49,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             isHotKeyTaken = true
         }
         installStatusItem()
+
+        // Opened by hand with the icon hidden: without this nothing at all would appear, as if
+        // the app had not started. Started at login, it stays out of sight as it was left.
+        if statusItem?.isVisible == false, !wasLaunchedAsLoginItem {
+            statusItem?.isVisible = true
+            panelController.show()
+        }
     }
 
-    /// Opening the app again while it runs (from Spotlight, Finder or `open`) shows the panel and
-    /// brings a hidden menu bar icon back: with the icon hidden there is no other way to its menu.
+    /// The system marks the event that launches a login item.
+    private var wasLaunchedAsLoginItem: Bool {
+        let launchEvent = NSAppleEventManager.shared().currentAppleEvent
+        return launchEvent?.paramDescriptor(forKeyword: AEKeyword(keyAEPropData))?.enumCodeValue
+            == OSType(keyAELaunchedAsLogInItem)
+    }
+
+    /// Opening the app while it runs (from Spotlight, Finder or `open`) shows the panel and brings
+    /// a hidden menu bar icon back: with the icon hidden there is no other way to its menu.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         statusItem?.isVisible = true
         panelController?.show()
@@ -74,6 +91,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         launchAtLoginMenuItem.title = strings.menuLaunchAtLogin
         launchAtLoginMenuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         hideIconMenuItem.title = strings.menuHideIcon
+        // Without the shortcut the icon is the only way to the panel, and the only place that
+        // says the shortcut is taken.
+        hideIconMenuItem.isEnabled = !isHotKeyTaken
         quitMenuItem.title = strings.menuQuit
     }
 
@@ -85,7 +105,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         // The system remembers under this name whether the icon is shown, and lets it be removed
         // the way other menu bar icons are, by dragging it out with the Command key held.
-        statusItem.autosaveName = "QuickAccessMenuBarIcon"
+        if remembersMenuBarIcon {
+            statusItem.autosaveName = "QuickAccessMenuBarIcon"
+        }
         statusItem.behavior = .removalAllowed
 
         let menu = NSMenu()

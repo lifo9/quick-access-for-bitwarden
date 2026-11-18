@@ -171,6 +171,8 @@ struct QuickAccessView: View {
 
     private var actionList: some View {
         let actions = model.actions
+        // Looked up once for the list, not once per row.
+        let strings = model.strings
         return SelectableList(
             rowIds: actions.map(\.id),
             selectedRowIndex: model.selectedActionIndex,
@@ -179,7 +181,7 @@ struct QuickAccessView: View {
             rowContent: { actionIndex, isSelected in
                 let action = actions[actionIndex]
                 HStack {
-                    Text(model.strings.title(of: action))
+                    Text(strings.title(of: action))
                         .font(.system(size: 14))
                         .lineLimit(1)
                     Spacer()

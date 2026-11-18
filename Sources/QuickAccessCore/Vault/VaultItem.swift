@@ -19,9 +19,8 @@ public enum VaultFieldRole: Sendable, Equatable {
     case other
 }
 
-/// What a field holds, for the app to name it in the user's language. The names of custom
-/// fields are the user's own.
-public enum VaultFieldName: Hashable, Sendable {
+/// What a field defined by Bitwarden holds, for the app to name it in the user's language.
+public enum StandardFieldName: Hashable, Sendable, CaseIterable {
     case username
     case password
     case oneTimeCode
@@ -54,21 +53,15 @@ public enum VaultFieldName: Hashable, Sendable {
     case sshPublicKey
     case sshKeyFingerprint
     case sshPrivateKey
+}
+
+/// The name of a field: one of Bitwarden's, or the user's own for a custom field.
+public enum VaultFieldName: Hashable, Sendable {
+    case standard(StandardFieldName)
     /// A custom field, with the name the user gave it.
     case custom(String)
     /// A custom field without a name; the number is its place among the item's custom fields.
     case unnamedCustom(Int)
-
-    /// Every name except those of custom fields: the ones that need a text in each language.
-    public static let standardNames: [VaultFieldName] = [
-        .username, .password, .oneTimeCode, .website, .notes,
-        .cardNumber, .cardSecurityCode, .cardholderName, .cardExpirationMonth, .cardExpirationYear, .cardBrand,
-        .identityEmail, .identityUsername, .identityPhone, .identityTitle, .identityFirstName,
-        .identityMiddleName, .identityLastName, .identityCompany, .identityAddress1, .identityAddress2,
-        .identityAddress3, .identityCity, .identityState, .identityPostalCode, .identityCountry,
-        .identitySocialSecurityNumber, .identityPassportNumber, .identityLicenseNumber,
-        .sshPublicKey, .sshKeyFingerprint, .sshPrivateKey,
-    ]
 }
 
 /// One copyable value of an item. The value itself stays encrypted until `VaultItem.revealValue`

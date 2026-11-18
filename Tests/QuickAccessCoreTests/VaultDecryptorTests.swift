@@ -86,7 +86,10 @@ final class VaultDecryptorTests: XCTestCase {
         XCTAssertEqual(try item.revealValue(of: XCTUnwrap(item.defaultField)), "4111111111111111")
         XCTAssertEqual(
             item.fields.map(\.name),
-            [.cardNumber, .cardSecurityCode, .cardholderName, .cardExpirationMonth, .cardExpirationYear, .cardBrand])
+            [
+                .standard(.cardNumber), .standard(.cardSecurityCode), .standard(.cardholderName),
+                .standard(.cardExpirationMonth), .standard(.cardExpirationYear), .standard(.cardBrand),
+            ])
     }
 
     func test_unlock__decryptsSecureNoteAndCustomFields() throws {
@@ -116,7 +119,7 @@ final class VaultDecryptorTests: XCTestCase {
 
         XCTAssertEqual(item.kind, .secureNote)
         XCTAssertEqual(try item.revealValue(of: XCTUnwrap(item.defaultField)), "guest network")
-        XCTAssertEqual(item.fields.map(\.name), [.notes, .custom("SSID"), .custom("Key")])
+        XCTAssertEqual(item.fields.map(\.name), [.standard(.notes), .custom("SSID"), .custom("Key")])
         XCTAssertEqual(item.fields.map(\.isConcealed), [false, false, true])
         XCTAssertEqual(try item.revealValue(of: item.fields[2]), "hunter2")
     }
@@ -156,7 +159,10 @@ final class VaultDecryptorTests: XCTestCase {
         XCTAssertEqual(item.subtitle, "Alice Example")
         XCTAssertEqual(
             item.fields.map(\.name),
-            [.identityEmail, .identityFirstName, .identityLastName, .identitySocialSecurityNumber])
+            [
+                .standard(.identityEmail), .standard(.identityFirstName), .standard(.identityLastName),
+                .standard(.identitySocialSecurityNumber),
+            ])
         XCTAssertEqual(item.fields.last?.isConcealed, true)
     }
 
@@ -243,9 +249,12 @@ final class VaultDecryptorTests: XCTestCase {
 
         XCTAssertEqual(
             item.fields.map(\.name),
-            [.username, .password, .oneTimeCode, .website, .notes, .custom("Account number")]
+            [
+                .standard(.username), .standard(.password), .standard(.oneTimeCode), .standard(.website),
+                .standard(.notes), .custom("Account number"),
+            ]
         )
-        XCTAssertEqual(releasedNames, [.username, .website])
+        XCTAssertEqual(releasedNames, [.standard(.username), .standard(.website)])
     }
 
     func test_revealValue__refusesTheNoteOfSecureNoteWithMasterPasswordReprompt() throws {
@@ -282,7 +291,7 @@ final class VaultDecryptorTests: XCTestCase {
 
         let item = try XCTUnwrap(unlock(ciphers: [sharedLogin]).items.first)
 
-        XCTAssertEqual(item.fields.map(\.name), [.username, .website, .custom("Hint")])
+        XCTAssertEqual(item.fields.map(\.name), [.standard(.username), .standard(.website), .custom("Hint")])
     }
 
     // MARK: - Reading the state file

@@ -15,8 +15,11 @@ enum AppLanguage: Equatable, CaseIterable {
     ///     when it follows the system.
     ///   - preferredSystemLanguages: The system's languages in order of preference.
     static func resolve(desktopLocale: String?, preferredSystemLanguages: [String]) -> AppLanguage {
-        let locale = desktopLocale ?? preferredSystemLanguages.first ?? "en"
-        let languageCode = locale.lowercased().split { $0 == "-" || $0 == "_" }.first.map(String.init)
+        // A stored locale without a language in it means the same as none: follow the system.
+        let languageCodes = [desktopLocale, preferredSystemLanguages.first].compactMap { locale in
+            locale?.lowercased().split { $0 == "-" || $0 == "_" }.first.map(String.init)
+        }
+        let languageCode = languageCodes.first
         switch languageCode {
         case "sk": return .slovak
         case "cs": return .czech
@@ -90,7 +93,7 @@ struct AppStrings: Sendable {
     let cancel: String
 
     /// The names of an item's fields, by what the field holds.
-    let fieldNames: [VaultFieldName: String]
+    let fieldNames: [StandardFieldName: String]
 
     static func strings(for language: AppLanguage) -> AppStrings {
         switch language {
@@ -107,9 +110,10 @@ struct AppStrings: Sendable {
             customName
         case .unnamedCustom(let fieldNumber):
             unnamedCustomField(fieldNumber)
-        default:
-            // Every other name has a translation; the English one is a safety net.
-            fieldNames[fieldName] ?? AppStrings.english.fieldNames[fieldName] ?? ""
+        case .standard(let standardName):
+            // A test checks that every language names every standard field; English is the
+            // safety net should one be missed all the same.
+            fieldNames[standardName] ?? AppStrings.english.fieldNames[standardName] ?? ""
         }
     }
 
@@ -138,7 +142,7 @@ struct AppStrings: Sendable {
         case .masterPasswordNeededFirst: masterPasswordNeededFirst
         case .touchIdSwitchedOffInBitwarden: touchIdSwitchedOffInBitwarden
         case .touchIdNotAvailable: touchIdNotAvailable
-        case .cannotUnlockWithTouchId(let status): cannotUnlockWithTouchId(status)
+        case .cannotUnlockWithTouchId(let statusCode): cannotUnlockWithTouchId("\(statusCode)")
         case .desktopAppNotInstalled: desktopAppNotInstalled
         case .noAccountLoggedIn: noAccountLoggedIn
         case .unsupportedAccountEncryption: unsupportedAccountEncryption

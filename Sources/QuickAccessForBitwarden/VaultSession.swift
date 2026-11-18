@@ -8,7 +8,8 @@ enum UnlockFailure: Equatable {
     case masterPasswordNeededFirst
     case touchIdSwitchedOffInBitwarden
     case touchIdNotAvailable
-    case cannotUnlockWithTouchId(status: String)
+    /// The desktop app's status, by its number, which is what a report of the problem needs.
+    case cannotUnlockWithTouchId(statusCode: Int)
     case desktopAppNotInstalled
     case noAccountLoggedIn
     case unsupportedAccountEncryption
@@ -27,7 +28,7 @@ enum UnlockFailure: Equatable {
             self = .touchIdNotAvailable
         case .available, .autoSetupNeeded, .manualSetupNeeded, .platformUnsupported, .desktopDisconnected,
             .nativeMessagingPermissionMissing:
-            self = .cannotUnlockWithTouchId(status: "\(status)")
+            self = .cannotUnlockWithTouchId(statusCode: status.rawValue)
         }
     }
 
@@ -183,13 +184,20 @@ final class VaultSession {
     /// Picks up what the desktop app has synced or changed: its settings always, which decide
     /// among other things the language of the panel, and the vault when it is unlocked here.
     func reloadIfDesktopStateChanged() {
+        // An unlock under way has read the state and will decrypt exactly what it read. Marking
+        // a newer state as seen now would hide it from the reload after the unlock.
+        if case .unlocking = state {
+            return
+        }
         do {
             let currentModificationDate = try desktop.readStateModificationDate()
             guard currentModificationDate != stateFileModificationDate else {
                 return
             }
-            let desktopState = try desktop.loadState()
+            // Recorded before the attempt: a state that cannot be read is not read again and
+            // again, only once it has changed.
             stateFileModificationDate = currentModificationDate
+            let desktopState = try desktop.loadState()
             settings = desktopState.settings
             guard case .unlocked = state, let userKey else {
                 return
