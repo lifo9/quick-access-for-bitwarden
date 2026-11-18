@@ -40,12 +40,18 @@ cannot create it. Create it once, into the `match` repository, from a Mac:
 ```sh
 MATCH_GIT_URL=<the match repository> \
 MATCH_TYPE=developer_id MATCH_PLATFORM=macos MATCH_SKIP_PROVISIONING_PROFILES=true \
-MATCH_APP_IDENTIFIER=dev.filo.quick-access-for-bitwarden \
+MATCH_APP_IDENTIFIER=<the bundle identifier of an app the team has registered> \
     bundle exec fastlane match
 ```
 
 `match` asks for the Apple ID and for the passphrase of the repository. The app uses no capability
 that needs a provisioning profile, so none is created.
+
+The identifier is not this app's: whenever `match` may create something it first checks that the
+App ID exists in the developer portal, also with profiles skipped, and this app has none there,
+since only a provisioning profile would need one. The certificate belongs to the team, not to an
+App ID, so any registered one will do. The release runs `match` read-only, which does not ask
+the portal.
 
 Run it through `bundle exec`, which uses the fastlane version the lock file pins. Signing in with
 an Apple ID needs fastlane 2.240.0 or later: Apple removed the endpoint older versions use for
