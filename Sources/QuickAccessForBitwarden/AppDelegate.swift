@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let panelController = QuickAccessPanelController(
             model: QuickAccessModel(
                 session: session,
+                iconStore: WebsiteIconStore(),
                 clipboard: clipboard,
                 usageStore: UsageStore(),
                 openInBrowser: { NSWorkspace.shared.open($0) }

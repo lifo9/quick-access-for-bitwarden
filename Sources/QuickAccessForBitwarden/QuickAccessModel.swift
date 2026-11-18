@@ -26,6 +26,7 @@ final class QuickAccessModel {
     }
 
     let session: VaultSession
+    let iconStore: WebsiteIconStore
     private let clipboard: ClipboardWriter
     private let usageStore: UsageStore
     private let openInBrowser: (URL) -> Void
@@ -48,22 +49,38 @@ final class QuickAccessModel {
 
     init(
         session: VaultSession,
+        iconStore: WebsiteIconStore,
         clipboard: ClipboardWriter,
         usageStore: UsageStore,
         openInBrowser: @escaping (URL) -> Void
     ) {
         self.session = session
+        self.iconStore = iconStore
         self.clipboard = clipboard
         self.usageStore = usageStore
         self.openInBrowser = openInBrowser
-        // The items carry their keys, so a locked session must not leave them in the panel.
+        // The items carry their keys, so a locked session must not leave them in the panel;
+        // the icons would still tell which websites the vault holds.
         session.didLock = { [weak self] in
             self?.refreshMatchingItems()
+            self?.iconStore.forgetAll()
         }
     }
 
     var selectedItem: VaultItem? {
         matchingItems.indices.contains(selectedItemIndex) ? matchingItems[selectedItemIndex] : nil
+    }
+
+    /// Where the icon of a login's website comes from, by the desktop app's rule: the first
+    /// website of the login, from the icon service of the account's server. `nil` for items
+    /// that get a generic symbol, and when the desktop app has website icons switched off.
+    func websiteIconUrl(of item: VaultItem) -> URL? {
+        guard item.kind == .login, let iconServerUrl = session.settings.websiteIconServerUrl,
+            let website = item.websites.first
+        else {
+            return nil
+        }
+        return WebsiteIcon.iconUrl(forWebsite: website, iconServerUrl: iconServerUrl)
     }
 
     var actions: [ItemAction] {

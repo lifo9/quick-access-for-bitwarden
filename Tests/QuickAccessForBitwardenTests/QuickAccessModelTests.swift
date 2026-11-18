@@ -35,6 +35,40 @@ private final class FakeDesktop: DesktopAccess {
     }
 }
 
+/// Stands in for the icon service: answers every request with the same small image, or fails.
+private final class FakeIconService: @unchecked Sendable {
+    private let lock = NSLock()
+    private var urls = [URL]()
+    private var data: Data? = FakeIconService.makeImageData()
+
+    var requestedUrls: [URL] {
+        lock.withLock { urls }
+    }
+
+    /// `nil` makes every request fail.
+    func setResponseData(_ responseData: Data?) {
+        lock.withLock { data = responseData }
+    }
+
+    func fetch(_ iconUrl: URL) async throws -> Data {
+        let responseData = lock.withLock {
+            urls.append(iconUrl)
+            return data
+        }
+        guard let responseData else {
+            throw URLError(.badServerResponse)
+        }
+        return responseData
+    }
+
+    static func makeImageData() -> Data {
+        let bitmap = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        return bitmap.representation(using: .png, properties: [:])!
+    }
+}
+
 /// Records what the model asks of the app around it.
 @MainActor
 private final class EffectRecorder {
@@ -62,6 +96,7 @@ private final class Harness {
     let session: VaultSession
     let model: QuickAccessModel
     let clock = TestClock()
+    let iconService = FakeIconService()
     private let effects = EffectRecorder()
     private let defaultsSuiteName = "QuickAccessModelTests-\(UUID().uuidString)"
 
@@ -74,6 +109,7 @@ private final class Harness {
         )
         model = QuickAccessModel(
             session: session,
+            iconStore: WebsiteIconStore(fetchIconData: iconService.fetch),
             clipboard: ClipboardWriter(pasteboard: pasteboard),
             usageStore: UsageStore(defaults: UserDefaults(suiteName: defaultsSuiteName)!),
             openInBrowser: { [effects] in effects.openedUrls.append($0) }
@@ -383,6 +419,78 @@ final class QuickAccessModelTests: XCTestCase {
 
         harness.model.stepBack()
         XCTAssertEqual(harness.numDismissals, 1)
+    }
+
+    // MARK: - Website icons
+
+    private func makeIconSettings(showsIcons: Bool = true) -> [String: Any] {
+        [
+            StateFileBuilder.settingKey("environment_environment"): [
+                "region": "Self-hosted", "urls": ["base": "https://vault.example.com"],
+            ],
+            "global_domainSettings_showFavicons": showsIcons,
+        ]
+    }
+
+    func test_websiteIconUrl__namesTheIconOnTheDesktopAppsIconService() async throws {
+        let harness = try await makeUnlockedHarness(settings: makeIconSettings())
+        let item = try XCTUnwrap(harness.model.selectedItem)
+
+        XCTAssertEqual(
+            harness.model.websiteIconUrl(of: item)?.absoluteString,
+            "https://vault.example.com/icons/example.com/icon.png"
+        )
+    }
+
+    func test_websiteIconUrl__givesNoIconWhenTheDesktopAppHidesWebsiteIcons() async throws {
+        let harness = try await makeUnlockedHarness(settings: makeIconSettings(showsIcons: false))
+        let item = try XCTUnwrap(harness.model.selectedItem)
+
+        XCTAssertNil(harness.model.websiteIconUrl(of: item))
+    }
+
+    func test_loadIcon__fetchesEachIconOnceAndKeepsIt() async throws {
+        let harness = try await makeUnlockedHarness(settings: makeIconSettings())
+        let iconUrl = try XCTUnwrap(harness.model.websiteIconUrl(of: XCTUnwrap(harness.model.selectedItem)))
+
+        XCTAssertNil(harness.model.iconStore.icon(at: iconUrl))
+        await harness.model.iconStore.loadIcon(at: iconUrl)
+        await harness.model.iconStore.loadIcon(at: iconUrl)
+
+        XCTAssertNotNil(harness.model.iconStore.icon(at: iconUrl))
+        XCTAssertEqual(harness.iconService.requestedUrls, [iconUrl])
+    }
+
+    func test_loadIcon__doesNotRepeatARequestThatFailed() async throws {
+        let harness = try await makeUnlockedHarness(settings: makeIconSettings())
+        let iconUrl = try XCTUnwrap(harness.model.websiteIconUrl(of: XCTUnwrap(harness.model.selectedItem)))
+        harness.iconService.setResponseData(nil)
+
+        await harness.model.iconStore.loadIcon(at: iconUrl)
+        await harness.model.iconStore.loadIcon(at: iconUrl)
+
+        XCTAssertNil(harness.model.iconStore.icon(at: iconUrl))
+        XCTAssertEqual(harness.iconService.requestedUrls.count, 1)
+    }
+
+    func test_loadIcon__ignoresAnAnswerThatIsNotAnImage() async throws {
+        let harness = try await makeUnlockedHarness(settings: makeIconSettings())
+        let iconUrl = try XCTUnwrap(harness.model.websiteIconUrl(of: XCTUnwrap(harness.model.selectedItem)))
+        harness.iconService.setResponseData(Data("<html>not found</html>".utf8))
+
+        await harness.model.iconStore.loadIcon(at: iconUrl)
+
+        XCTAssertNil(harness.model.iconStore.icon(at: iconUrl))
+    }
+
+    func test_lock__forgetsTheWebsiteIcons() async throws {
+        let harness = try await makeUnlockedHarness(settings: makeIconSettings())
+        let iconUrl = try XCTUnwrap(harness.model.websiteIconUrl(of: XCTUnwrap(harness.model.selectedItem)))
+        await harness.model.iconStore.loadIcon(at: iconUrl)
+
+        harness.session.lock()
+
+        XCTAssertNil(harness.model.iconStore.icon(at: iconUrl))
     }
 
     // MARK: - Locking and following the desktop app

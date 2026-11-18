@@ -134,6 +134,18 @@ private struct StateFile: Decodable {
                 forKey: userStateKey("biometricSettings_biometricUnlockEnabled")
             ) ?? false
 
+        // Icons are an extra: an environment in a shape this app does not know means no icons,
+        // not a vault that cannot be read.
+        let showsWebsiteIcons =
+            (try? container.decodeIfPresent(Bool.self, forKey: StateKey("global_domainSettings_showFavicons")))
+            ?? true
+        let accountEnvironment = try? container.decodeIfPresent(
+            StoredEnvironment.self,
+            forKey: userStateKey("environment_environment")
+        )
+        let websiteIconServerUrl =
+            showsWebsiteIcons ? WebsiteIcon.resolveIconServerUrl(environment: accountEnvironment) : nil
+
         desktopState = DesktopState(
             userId: userId,
             encryptedPrivateKey: classicKeys.privateKey,
@@ -143,7 +155,8 @@ private struct StateFile: Decodable {
                 vaultTimeout: storedVaultTimeout?.vaultTimeout ?? VaultTimeout.desktopDefault,
                 clipboardClearDelay: storedClipboardClearDelay.map(ClipboardClearDelay.init(storedText:))
                     ?? ClipboardClearDelay.desktopDefault,
-                isBiometricUnlockEnabled: isBiometricUnlockEnabled
+                isBiometricUnlockEnabled: isBiometricUnlockEnabled,
+                websiteIconServerUrl: websiteIconServerUrl
             )
         )
     }

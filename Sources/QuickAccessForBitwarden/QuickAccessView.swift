@@ -80,7 +80,7 @@ struct QuickAccessView: View {
 
     private func itemHeader(_ item: VaultItem) -> some View {
         HStack(spacing: 12) {
-            ItemIcon(kind: item.kind)
+            ItemIcon(item: item, model: model)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.name)
                     .font(.system(size: 17, weight: .semibold))
@@ -145,7 +145,7 @@ struct QuickAccessView: View {
                 rowContent: { itemIndex, isSelected in
                     let item = items[itemIndex]
                     HStack(spacing: 12) {
-                        ItemIcon(kind: item.kind)
+                        ItemIcon(item: item, model: model)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(item.name)
                                 .font(.system(size: 14, weight: .medium))
@@ -292,17 +292,37 @@ private struct SelectableList<RowContent: View>: View {
     }
 }
 
+/// The website's icon for a login that has one, else a symbol for the kind of item.
 private struct ItemIcon: View {
-    let kind: VaultItemKind
+    let item: VaultItem
+    let model: QuickAccessModel
 
     var body: some View {
-        Image(systemName: symbolName)
-            .font(.system(size: 15, weight: .medium))
-            .frame(width: 26, height: 26)
+        let websiteIconUrl = model.websiteIconUrl(of: item)
+        Group {
+            if let websiteIconUrl, let websiteIcon = model.iconStore.icon(at: websiteIconUrl) {
+                Image(nsImage: websiteIcon)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 22, height: 22)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            } else {
+                Image(systemName: symbolName)
+                    .font(.system(size: 15, weight: .medium))
+            }
+        }
+        .frame(width: 26, height: 26)
+        // Runs when the row appears, so icons are only fetched for items that are looked at.
+        .task(id: websiteIconUrl) {
+            if let websiteIconUrl {
+                await model.iconStore.loadIcon(at: websiteIconUrl)
+            }
+        }
     }
 
     private var symbolName: String {
-        switch kind {
+        switch item.kind {
         case .login: "globe"
         case .secureNote: "note.text"
         case .card: "creditcard"

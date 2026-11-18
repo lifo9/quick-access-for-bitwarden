@@ -22,6 +22,8 @@ A flat JSON object. Keys are `global_<group>_<name>` and `user_<user id>_<group>
 | `user_<id>_vaultTimeoutSettings_vaultTimeout`     | `never`, `onRestart`, `onLocked`, `onSleep`, `onIdle` or a number of minutes |
 | `user_<id>_autofillSettingsLocal_clearClipboardDelay` | `never`, `tenSeconds`, … `fiveMinutes`                  |
 | `user_<id>_biometricSettings_biometricUnlockEnabled`  | Whether Touch ID unlock is on                           |
+| `global_domainSettings_showFavicons`              | "Show website icons"; on when absent                        |
+| `user_<id>_environment_environment`               | `{"region", "urls": {"base", "icons", "webVault", …}}`, the account's server |
 
 Values that are absent take the desktop app's defaults, which upstream defines in:
 
@@ -31,6 +33,14 @@ Values that are absent take the desktop app's defaults, which upstream defines i
 - clear clipboard `fiveMinutes`: `libs/common/src/autofill/services/autofill-settings.service.ts`;
   the names in `libs/common/src/autofill/constants/index.ts`
 - "idle" means five minutes without input: `apps/desktop/src/main/power-monitor.main.ts`
+
+### Website icons
+
+The icon of a login is `<icon service>/<host name of its first website>/icon.png`
+(`libs/common/src/vault/icon/build-cipher-icon.ts`). The icon service is `urls.icons` if set, else
+`/icons` on `urls.base` or `urls.webVault`, else the service of the cloud region `US` or `EU`
+(`libs/common/src/platform/services/default-environment.service.ts`). Where the desktop app would
+fall back to the US cloud for an environment that names no server, this app shows no icons.
 
 ### Encryption
 
@@ -73,6 +83,14 @@ Upstream sources:
 
 The Touch ID prompt is a system dialog owned by the desktop app. No reply comes until the user
 acts on it, and macOS fails it at once while the screen is locked.
+
+The socket is in the desktop app's app group container
+(`~/Library/Group Containers/LTZ2PFU5D6.com.bitwarden.desktop/s.bw`, see
+`apps/desktop/desktop_native/core/src/ipc/mod.rs`). Only a process that is not sandboxed, or the
+desktop app's own proxy, can reach it, which is why this app cannot be sandboxed and so cannot be
+distributed through the Mac App Store. The proxy is expected at `Contents/MacOS/desktop_proxy` in
+the desktop app's bundle; `InstalledDesktopApp.locateProxyExecutable` has to follow if upstream
+moves it.
 
 ### Successor protocol
 

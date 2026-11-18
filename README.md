@@ -22,11 +22,12 @@ an independent project, not affiliated with, endorsed by or sponsored by Bitward
   | Vault timeout                  | When the app forgets the vault key (idle, sleep, screen lock, …) |
   | Clear clipboard                | When a copied value is removed from the clipboard                |
   | Unlock with Touch ID           | Must be on; it is the only way to unlock                         |
-  | Master password re-prompt      | Secret fields of such items are refused, not revealed            |
-  | "View password" off (shared)   | Password and one-time code of the item are not offered           |
+  | Show website icons             | Whether icons are fetched, from the account's icon service       |
+  | Master password re-prompt      | Only username and website of such items can be copied            |
+  | "View password" off (shared)   | Password, one-time code and hidden fields are not offered        |
 
-There is no network access, no login and no synchronization: what the desktop app has synced is
-what the panel shows.
+There is no login and no synchronization: what the desktop app has synced is what the panel shows.
+The only network requests fetch website icons, as described under Security notes.
 
 ## Requirements
 
@@ -89,6 +90,10 @@ that shortcut off under System Settings → Keyboard → Keyboard Shortcuts.
   and a random client id.
 - Copied secrets carry the marker that tells clipboard managers not to record them, and are
   removed after the desktop app's clear-clipboard delay if they are still on the clipboard.
+- Website icons are the only network traffic. Like the Bitwarden apps, the app asks the icon
+  service of the account's server (the self-hosted server, or Bitwarden's cloud) for the icon of
+  a login's host name, only for items that are on screen and only while "Show website icons" is
+  on in the desktop app. Icons are kept in memory, not on disk, and forgotten on lock.
 - The desktop app's IPC does not authenticate its clients: any process of the same user can ask
   for a Touch ID unlock. This app does not widen that; it is one more such client.
 

@@ -62,14 +62,19 @@ public struct DesktopSettings: Sendable, Equatable {
     public let vaultTimeout: VaultTimeout
     public let clipboardClearDelay: ClipboardClearDelay
     public let isBiometricUnlockEnabled: Bool
+    /// The service website icons are fetched from; `nil` when "Show website icons" is switched
+    /// off in the desktop app or the account's server is not known.
+    public let websiteIconServerUrl: URL?
 
     public init(
         vaultTimeout: VaultTimeout,
         clipboardClearDelay: ClipboardClearDelay,
-        isBiometricUnlockEnabled: Bool
+        isBiometricUnlockEnabled: Bool,
+        websiteIconServerUrl: URL? = nil
     ) {
         self.vaultTimeout = vaultTimeout
         self.clipboardClearDelay = clipboardClearDelay
         self.isBiometricUnlockEnabled = isBiometricUnlockEnabled
+        self.websiteIconServerUrl = websiteIconServerUrl
     }
 }
